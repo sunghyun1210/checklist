@@ -761,9 +761,10 @@ const settings = $('settings-dialog');
 $('open-settings').addEventListener('click', () => settings.showModal());
 $('close-settings').addEventListener('click', () => settings.close());
 
-// Download all items as a JSON file
+// Download the tasks and the saved categories (with their order) as a JSON file
 $('export').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+  const backup = { version: 2, items: items, categories: savedCategories };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = 'checklist-backup.json';
@@ -771,7 +772,8 @@ $('export').addEventListener('click', () => {
   URL.revokeObjectURL(link.href);
 });
 
-// Pick a backup file and replace the current items with it
+// Pick a backup file and replace the current tasks (and categories) with it.
+// Older backups are just a list of tasks; newer ones are { items, categories }.
 $('import').addEventListener('click', () => $('import-file').click());
 
 $('import-file').addEventListener('change', async (e) => {
@@ -781,10 +783,15 @@ $('import-file').addEventListener('change', async (e) => {
 
   try {
     const data = JSON.parse(await file.text());
-    if (!Array.isArray(data)) throw new Error('not a list');
+    const list = Array.isArray(data) ? data : data && data.items;
+    if (!Array.isArray(list)) throw new Error('not a list');
     if (!confirm('Replace all current tasks with this backup?')) return;
     change(() => {
-      items = data.filter((it) => it && typeof it.text === 'string').map(cleanItem);
+      items = list.filter((it) => it && typeof it.text === 'string').map(cleanItem);
+      // Only newer backups carry categories; with an older one the saved categories stay as they are
+      if (data && Array.isArray(data.categories)) {
+        savedCategories = data.categories.filter((n) => typeof n === 'string' && n);
+      }
     });
     settings.close();
   } catch (err) {
