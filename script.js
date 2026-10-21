@@ -23,6 +23,8 @@ let subList = 'all'; // checklist: 'all' shows finished items too, 'todo' hides 
 let calMode = 'month'; // calendar: 'month' | 'week'
 let filter = ''; // sidebar: '' = everything (Inbox), or 'cat:' + lowercase category name
 let calDate = new Date(); // any day inside the month / week shown in the calendar
+let undoStack = []; // older versions of `items` (as JSON text), newest last
+let redoStack = []; // versions that were undone
 
 // ---------- Storage ----------
 
@@ -37,6 +39,36 @@ function loadItems() {
 
 function saveItems() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+// Every change to `items` goes through here: run it, remember the old version for undo, save, redraw
+function change(fn) {
+  const before = JSON.stringify(items);
+  fn();
+  if (JSON.stringify(items) !== before) {
+    undoStack.push(before);
+    if (undoStack.length > 50) undoStack.shift();
+    redoStack = []; // a new change ends the redo history
+  }
+  saveItems();
+  render();
+}
+
+// Move one step from one stack to the other (undo: undoStack -> redoStack, redo: the opposite)
+function restore(from, to) {
+  if (!from.length) return;
+  to.push(JSON.stringify(items));
+  items = JSON.parse(from.pop()).map(cleanItem);
+  saveItems();
+  render();
+}
+
+function undo() {
+  restore(undoStack, redoStack);
+}
+
+function redo() {
+  restore(redoStack, undoStack);
 }
 
 // Make sure every field exists and has the right type
@@ -234,6 +266,9 @@ function render() {
   $('checklist-view').hidden = calendar;
   $('calendar-view').hidden = !calendar;
 
+  $('undo').disabled = !undoStack.length;
+  $('redo').disabled = !redoStack.length;
+
   renderSidebar();
   renderHead();
   if (calendar) {
@@ -332,6 +367,11 @@ function renderChecklist() {
   groups.forEach((group) => {
     const section = el('section', 'group');
     const heading = el('h3', group.late ? 'overdue' : '', group.title);
+    if (group.late) {
+      const move = el('button', 'move-all', 'Move all to today');
+      move.type = 'button';
+      heading.append(move);
+    }
     const ul = document.createElement('ul');
     group.items.forEach((item) => ul.append(makeRow(item)));
     section.append(heading, ul);
@@ -503,19 +543,18 @@ form.addEventListener('submit', (e) => {
 
   // Things typed in the text win over the buttons below it
   const cat = parsed.category || $('chip-category').value;
-  items.push({
-    id: newId(),
-    text: parsed.text,
-    category: cat ? canonicalCategory(cat) : '',
-    minutes: parsed.minutes || Number($('chip-minutes').value),
-    due: parsed.due || $('chip-date').value || todayKey(),
-    done: false,
-    doneDate: '',
+  change(() => {
+    items.push({
+      id: newId(),
+      text: parsed.text,
+      category: cat ? canonicalCategory(cat) : '',
+      minutes: parsed.minutes || Number($('chip-minutes').value),
+      due: parsed.due || $('chip-date').value || todayKey(),
+      done: false,
+      doneDate: '',
+    });
   });
-  saveItems();
-
   dialog.close();
-  render();
 });
 
 // ---------- Settings: backup and reset ----------
@@ -547,10 +586,10 @@ $('import-file').addEventListener('change', async (e) => {
     const data = JSON.parse(await file.text());
     if (!Array.isArray(data)) throw new Error('not a list');
     if (!confirm('Replace all current tasks with this backup?')) return;
-    items = data.filter((it) => it && typeof it.text === 'string').map(cleanItem);
-    saveItems();
+    change(() => {
+      items = data.filter((it) => it && typeof it.text === 'string').map(cleanItem);
+    });
     settings.close();
-    render();
   } catch (err) {
     alert('That file is not a valid backup.');
   }
@@ -558,10 +597,10 @@ $('import-file').addEventListener('change', async (e) => {
 
 $('clear-all').addEventListener('click', () => {
   if (!confirm('Delete all tasks? This cannot be undone.')) return;
-  items = [];
-  saveItems();
+  change(() => {
+    items = [];
+  });
   settings.close();
-  render();
 });
 
 // ---------- List events ----------
@@ -570,20 +609,31 @@ const groupsBox = $('groups');
 
 // One listener for all checkboxes and delete buttons
 groupsBox.addEventListener('click', (e) => {
+  // "Move all to today" in the Overdue heading
+  if (e.target.matches('.move-all')) {
+    change(() => {
+      items.forEach((it) => {
+        if (!it.done && it.due < todayKey() && matchesFilter(it)) it.due = todayKey();
+      });
+    });
+    return;
+  }
+
   const li = e.target.closest('li');
   if (!li) return;
   const item = items.find((it) => it.id === li.dataset.id);
 
   if (e.target.matches('input[type="checkbox"]')) {
-    item.done = e.target.checked;
-    item.doneDate = item.done ? todayKey() : '';
+    const checked = e.target.checked;
+    change(() => {
+      item.done = checked;
+      item.doneDate = checked ? todayKey() : '';
+    });
   } else if (e.target.matches('.delete')) {
-    items = items.filter((it) => it !== item);
-  } else {
-    return;
+    change(() => {
+      items = items.filter((it) => it !== item);
+    });
   }
-  saveItems();
-  render();
 });
 
 // Double-click an item's text to edit it in place
@@ -609,13 +659,15 @@ groupsBox.addEventListener('dblclick', (e) => {
     finished = true;
     const parsed = parseInput(edit.value);
     if (save && parsed.text) { // empty text: keep the old item
-      item.text = parsed.text;
-      item.category = parsed.category ? canonicalCategory(parsed.category) : '';
-      item.minutes = parsed.minutes;
-      if (parsed.due) item.due = parsed.due;
-      saveItems();
+      change(() => {
+        item.text = parsed.text;
+        item.category = parsed.category ? canonicalCategory(parsed.category) : '';
+        item.minutes = parsed.minutes;
+        if (parsed.due) item.due = parsed.due;
+      });
+    } else {
+      render();
     }
-    render();
   }
 
   edit.addEventListener('keydown', (ev) => {
@@ -649,9 +701,7 @@ groupsBox.addEventListener('pointerdown', (e) => {
     document.removeEventListener('pointerup', end);
     document.removeEventListener('pointercancel', end);
     const ids = [...ul.querySelectorAll('li:not(.done)')].map((row) => row.dataset.id);
-    applyOrder(ids);
-    saveItems();
-    render();
+    change(() => applyOrder(ids)); // no undo step if the order did not change
   }
 
   document.addEventListener('pointermove', move);
@@ -674,9 +724,32 @@ function applyOrder(ids) {
 
 // Remove finished items that match the sidebar filter
 $('clear-done').addEventListener('click', () => {
-  items = items.filter((it) => !(it.done && matchesFilter(it)));
-  saveItems();
-  render();
+  change(() => {
+    items = items.filter((it) => !(it.done && matchesFilter(it)));
+  });
+});
+
+// ---------- Undo / redo ----------
+
+$('undo').addEventListener('click', undo);
+$('redo').addEventListener('click', redo);
+
+// Ctrl+Z undo, Ctrl+Y or Ctrl+Shift+Z redo (Cmd instead of Ctrl on a Mac).
+// While typing in a text box the browser's own undo for the text is used instead.
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  if (e.target.closest && e.target.closest('input:not([type="checkbox"]), textarea, select')) return;
+  if (document.querySelector('dialog[open]')) return;
+
+  const key = e.key.toLowerCase();
+  if (key === 'z' && !e.shiftKey) {
+    undo();
+  } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+    redo();
+  } else {
+    return;
+  }
+  e.preventDefault();
 });
 
 // ---------- Toolbars, sidebar and calendar buttons ----------

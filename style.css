@@ -189,6 +189,20 @@ h2 {
   color: var(--muted);
 }
 
+/* Round undo / redo buttons */
+#sidebar-bottom .round {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+.round:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* ---------- Sub toolbar ---------- */
 
 #content {
@@ -279,6 +293,24 @@ h2 {
 
 .group h3.overdue {
   color: var(--late);
+}
+
+.group h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Button in the Overdue heading: moves everything overdue to today */
+.move-all {
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: var(--late-soft);
+  color: var(--late);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .group ul {
@@ -722,9 +754,25 @@ dialog::backdrop {
     white-space: nowrap;
   }
 
-  /* Settings becomes one more pill in the row */
+  /* Settings becomes one more pill in the row; undo / redo float in the bottom left corner */
   #sidebar-bottom {
     display: contents;
+  }
+
+  #sidebar-bottom .round {
+    position: fixed;
+    bottom: 16px;
+    z-index: 10;
+    width: 44px;
+    height: 44px;
+  }
+
+  #undo {
+    left: 16px;
+  }
+
+  #redo {
+    left: 68px;
   }
 
   #head {
