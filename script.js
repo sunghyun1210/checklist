@@ -887,13 +887,16 @@ groupsBox.addEventListener('dblclick', (e) => {
 // because a finger on the row has to scroll the page.
 // The grabbed row follows the pointer, the other rows slide out of the way, and on release
 // the row slides into its place before the new order is saved.
-//   container   the element that holds the rows
-//   rowSelector which elements are the rows
-//   onDrop(list) is called with the list element after a drag, to save the new order
+//   container    the element that holds the rows
+//   rowSelector  which elements can be grabbed
+//   moving       which elements slide out of the way (the rows, and headings between them)
+//   locate(over, event, row)  where the grabbed row goes while the pointer is over `over`:
+//                { list, ref } = inside `list`, before `ref` (null = at the end), or null = nowhere
+//   onDrop(list, fromList, row)  save the result; `list` is where the row ended up
 const SLIDE_MS = 160;
 let dragLocked = false; // true while a dropped row is still sliding into place
 
-function enableDrag(container, rowSelector, onDrop) {
+function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
   container.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || dragLocked) return;
     const row = e.target.closest(rowSelector);
@@ -906,7 +909,7 @@ function enableDrag(container, rowSelector, onDrop) {
       if (e.target.closest('input, textarea, select, .delete, .remove-cat, .cat-edit')) return;
     }
 
-    const list = row.parentElement;
+    const fromList = row.parentElement;
     const startX = e.clientX;
     const startY = e.clientY;
     let dragging = false;
@@ -929,24 +932,26 @@ function enableDrag(container, rowSelector, onDrop) {
       row.style.transform = 'translateY(' + (startTop + (y - grabY) - natural) + 'px)';
     }
 
-    // Put the grabbed row before / after `target`; the other rows slide to their new places
-    function moveRow(target, below) {
-      const others = [...list.children].filter((c) => c !== row);
-      const before = others.map((c) => c.getBoundingClientRect().top); // where they are now (even mid-slide)
-      others.forEach((c) => {
-        c.style.transition = 'none';
-        c.style.transform = '';
+    // Put the grabbed row into `list` before `ref`; everything else slides to its new place
+    function moveRow(list, ref) {
+      if (ref === row || (row.parentElement === list && row.nextSibling === ref)) return; // already there
+
+      const others = [...container.querySelectorAll(moving)].filter((n) => n !== row);
+      const before = others.map((n) => n.getBoundingClientRect().top); // where they are now (even mid-slide)
+      others.forEach((n) => {
+        n.style.transition = 'none';
+        n.style.transform = '';
       });
 
-      list.insertBefore(row, below ? target.nextSibling : target);
+      list.insertBefore(row, ref);
 
-      others.forEach((c, i) => {
-        const delta = before[i] - c.getBoundingClientRect().top;
+      others.forEach((n, i) => {
+        const delta = before[i] - n.getBoundingClientRect().top;
         if (!delta) return;
-        c.style.transform = 'translateY(' + delta + 'px)'; // start where it was...
-        c.getBoundingClientRect(); // (let the browser apply that first)
-        c.style.transition = 'transform ' + SLIDE_MS + 'ms ease';
-        c.style.transform = ''; // ...and slide to the new place
+        n.style.transform = 'translateY(' + delta + 'px)'; // start where it was...
+        n.getBoundingClientRect(); // (let the browser apply that first)
+        n.style.transition = 'transform ' + SLIDE_MS + 'ms ease';
+        n.style.transform = ''; // ...and slide to the new place
       });
     }
 
@@ -963,12 +968,8 @@ function enableDrag(container, rowSelector, onDrop) {
         begin(ev.clientY);
       }
 
-      const over = document.elementFromPoint(ev.clientX, ev.clientY);
-      const target = over && over.closest(rowSelector);
-      if (target && target !== row && target.parentElement === list) {
-        const box = target.getBoundingClientRect();
-        moveRow(target, ev.clientY > box.top + box.height / 2);
-      }
+      const spot = locate(document.elementFromPoint(ev.clientX, ev.clientY), ev, row);
+      if (spot) moveRow(spot.list, spot.ref);
       follow(ev.clientY);
     }
 
@@ -993,7 +994,7 @@ function enableDrag(container, rowSelector, onDrop) {
       row.style.transform = 'none';
       setTimeout(() => {
         dragLocked = false;
-        onDrop(list); // saves, or just redraws when the order did not change
+        onDrop(row.parentElement, fromList, row); // saves, or just redraws when nothing changed
       }, SLIDE_MS + 20);
     }
 
@@ -1003,10 +1004,38 @@ function enableDrag(container, rowSelector, onDrop) {
   });
 }
 
-// Tasks: reorder inside one date group (finished tasks stay where they are)
-enableDrag(groupsBox, 'li.row:not(.done)', (ul) => {
-  const ids = [...ul.querySelectorAll('li.row:not(.done)')].map((row) => row.dataset.id);
-  change(() => applyOrder(ids)); // no undo step if the order did not change
+// Tasks: reorder inside a date group, or drop a task into another date group to give it that date.
+// (Overdue is not a date, so nothing can be dropped into it; finished tasks stay at the bottom.)
+enableDrag(groupsBox, 'li.row:not(.done)', {
+  moving: 'li.row, .group h3',
+
+  locate(over, ev, row) {
+    const group = over && over.closest('.group');
+    if (!group) return null;
+    const ul = group.querySelector('ul');
+    if (ul !== row.parentElement && !group.dataset.date) return null; // not into Overdue
+
+    const target = over.closest('li.row');
+    if (target && target !== row) {
+      // Over a finished task: go above the finished ones of that group
+      if (target.classList.contains('done')) return { list: ul, ref: ul.querySelector('li.row.done') };
+      const box = target.getBoundingClientRect();
+      return { list: ul, ref: ev.clientY > box.top + box.height / 2 ? target.nextSibling : target };
+    }
+    // Over the heading of a group: the top of that group
+    if (!target && over.closest('h3')) return { list: ul, ref: ul.firstChild };
+    return null;
+  },
+
+  onDrop(list, fromList, row) {
+    const date = list.closest('.group').dataset.date; // '' for Overdue
+    const id = row.dataset.id;
+    const ids = [...list.querySelectorAll('li.row:not(.done)')].map((r) => r.dataset.id);
+    change(() => {
+      if (list !== fromList && date) items.find((it) => it.id === id).due = date; // new date
+      applyOrder(ids); // no undo step if nothing changed
+    });
+  },
 });
 
 // Put the dragged items in a new order, using the same slots in `items`
@@ -1157,11 +1186,22 @@ $('category-list').addEventListener('dblclick', (e) => {
 });
 
 // Categories: reorder them in the sidebar (the order is saved)
-enableDrag($('category-list'), '.side-item', (list) => {
-  const order = [...list.children].map((btn) => btn.dataset.name);
-  change(() => {
-    savedCategories = order; // every category is saved with its place now
-  });
+enableDrag($('category-list'), '.side-item', {
+  moving: '.side-item',
+
+  locate(over, ev, row) {
+    const target = over && over.closest('.side-item');
+    if (!target || target === row || target.parentElement !== row.parentElement) return null;
+    const box = target.getBoundingClientRect();
+    return { list: row.parentElement, ref: ev.clientY > box.top + box.height / 2 ? target.nextSibling : target };
+  },
+
+  onDrop(list) {
+    const order = [...list.children].map((btn) => btn.dataset.name);
+    change(() => {
+      savedCategories = order; // every category is saved with its place now
+    });
+  },
 });
 
 newCategory.addEventListener('keydown', (e) => {
