@@ -182,8 +182,8 @@ function dueFromCode(code) {
   const now = fromKey(todayKey());
   code = code.toLowerCase();
 
-  if (code === 'today') return dateKey(now);
-  if (code === 'tom') return dateKey(addDays(now, 1));
+  if (code === 'today' || code === 'tdy') return dateKey(now);
+  if (code === 'tom' || code === 'tmr' || code === 'tomorrow') return dateKey(addDays(now, 1));
   if (code[0] === '+') return dateKey(addDays(now, Number(code.slice(1))));
 
   const dayIndex = DAYS.indexOf(code);
@@ -215,8 +215,9 @@ function parseInput(raw) {
     return space;
   });
 
-  // "d10/25", "d+3", "dtom", "dmon" as their own word set the due date
-  const dueWord = /(^|\s)d(\+\d+|\d{1,2}\/\d{1,2}|today|tom|sun|mon|tue|wed|thu|fri|sat)(?=\s|$)/i;
+  // "d10/25", "d+3", "dtom" (or dtmr, dtomorrow), "dtdy" (or dtoday), "dmon" as their own word set the due date
+  const dueWord =
+    /(^|\s)d(\+\d+|\d{1,2}\/\d{1,2}|today|tdy|tomorrow|tom|tmr|sun|mon|tue|wed|thu|fri|sat)(?=\s|$)/i;
   text = text.replace(dueWord, (match, space, code) => {
     due = dueFromCode(code);
     return due ? space : match; // an invalid date stays as normal text
