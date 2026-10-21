@@ -523,11 +523,38 @@ function openTaskDialog(date) {
   $('chip-date').value = date || todayKey();
   $('chip-minutes').value = '0';
   input.value = '';
+  showPreview();
   dialog.showModal();
   input.focus();
 }
 
+// Under the text box: small labels for the @category, t25 and d10/25 that were recognized
+function showPreview() {
+  const parsed = parseInput(input.value);
+  const box = $('preview');
+  box.innerHTML = '';
+
+  if (parsed.category) {
+    const pill = el('span', 'pill cat', '@' + parsed.category);
+    colorize(pill, parsed.category);
+    box.append(pill);
+  }
+  if (parsed.minutes) box.append(el('span', 'pill', formatMinutes(parsed.minutes)));
+  if (parsed.due) box.append(el('span', 'pill', dateLabel(parsed.due)));
+}
+
+input.addEventListener('input', showPreview);
+
 $('new-task').addEventListener('click', () => openTaskDialog());
+
+// Shift+A opens the popup from anywhere (not while typing, and not when a popup is already open)
+document.addEventListener('keydown', (e) => {
+  if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || e.key.toLowerCase() !== 'a') return;
+  if (e.target.closest && e.target.closest('input:not([type="checkbox"]), textarea, select')) return;
+  if (document.querySelector('dialog[open]')) return;
+  e.preventDefault(); // so the letter is not typed into the box that is about to get focus
+  openTaskDialog();
+});
 
 // Click on the dark area around a popup closes it (Esc works by default)
 document.querySelectorAll('dialog').forEach((d) => {

@@ -676,6 +676,36 @@ dialog::backdrop {
   margin-left: auto;
 }
 
+/* What the text box understood (category, time, date) */
+#preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#preview:empty {
+  display: none;
+}
+
+#add-form .hint {
+  font-size: 0.8rem;
+}
+
+#add-form .hint b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Shortcut label inside the New task button */
+#new-task kbd {
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  font: inherit;
+  font-size: 0.72rem;
+}
+
 .dialog-body {
   display: flex;
   flex-direction: column;
@@ -796,6 +826,10 @@ dialog::backdrop {
   #checklist-view,
   #calendar-view {
     overflow: visible;
+  }
+
+  #new-task kbd {
+    display: none; /* no keyboard on a phone */
   }
 
   /* Round New task button in the bottom right corner */

@@ -14,7 +14,7 @@
       <button type="button" data-view="checklist">Checklist</button>
       <button type="button" data-view="calendar">Calendar</button>
     </nav>
-    <button type="button" id="new-task">+ New task</button>
+    <button type="button" id="new-task">+ New task <kbd>&#8679;A</kbd></button>
   </header>
 
   <div id="layout">
@@ -78,6 +78,8 @@
   <dialog id="task-dialog">
     <form id="add-form">
       <input id="new-item" type="text" placeholder='Add a new item (e.g. @Category "task" t30)' autocomplete="off">
+      <!-- Shows what was recognized in the text while typing -->
+      <div id="preview"></div>
       <div class="chips">
         <input id="chip-date" type="date" aria-label="Due date">
         <select id="chip-category" aria-label="Category"></select>
@@ -95,6 +97,10 @@
         </select>
         <button type="submit">Add</button>
       </div>
+      <p class="hint">
+        <b>@category</b> &middot; <b>t25</b> = 25 min &middot; <b>d10/25</b> &middot; <b>d+3</b> (3 days later)
+        &middot; <b>dtom</b> &middot; <b>dmon</b> &middot; Enter adds, Esc closes
+      </p>
     </form>
   </dialog>
 
