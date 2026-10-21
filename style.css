@@ -139,6 +139,10 @@ h2 {
   gap: 2px;
   min-height: 0;
   overflow-y: auto;
+  /* A scrolling box cuts off anything outside it (the search ring, shadows).
+     Padding gives them room; the negative margin keeps everything in the same place. */
+  padding: 8px;
+  margin: -8px;
 }
 
 /* Sidebar groups (Inbox, Categories): same title, same rows, both can be folded */
