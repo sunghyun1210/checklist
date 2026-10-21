@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'checklist-items';
 
-// Each item: { id, text, category, scope, period, done }
+// Each item: { id, text, category, minutes, scope, period, done }
 // scope is 'day' | 'week' | 'month'; period is the key of that day/week/month
 let items = loadItems();
 let scope = 'day';
@@ -115,13 +115,23 @@ function render() {
       li.append(tag);
     }
 
+    if (item.minutes) {
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = formatMinutes(item.minutes);
+      li.append(time);
+    }
+
     li.append(del);
     list.appendChild(li);
   });
 
   // Footer: remaining count + clear button (hidden when the list is empty)
-  const left = visible.filter((item) => !item.done).length;
+  const remaining = visible.filter((item) => !item.done);
+  const left = remaining.length;
+  const minutesLeft = remaining.reduce((sum, item) => sum + (item.minutes || 0), 0);
   count.textContent = left + (left === 1 ? ' item left' : ' items left');
+  if (minutesLeft) count.textContent += ' · ' + formatMinutes(minutesLeft);
   footer.hidden = visible.length === 0;
 }
 
@@ -178,17 +188,33 @@ function renderCategoryTabs() {
   });
 }
 
-// "@AIE510 quiz 3" -> { category: 'AIE510', text: 'quiz 3' }
+// "@AIE510 quiz 3 t25" -> { category: 'AIE510', text: 'quiz 3', minutes: 25 }
 function parseInput(raw) {
   let cat = '';
-  let text = raw.replace(/(^|\s)@(\S+)/, (match, space, name) => {
+  let minutes = 0;
+
+  let text = raw.replace(/(^|\s)@(\S+)/, (_, space, name) => {
     cat = name; // only the first @word counts
+    return space;
+  });
+
+  // "t25" as its own word means 25 minutes
+  text = text.replace(/(^|\s)t(\d+)(?=\s|$)/i, (_, space, number) => {
+    minutes = Number(number);
     return space;
   });
 
   text = text.replace(/\s+/g, ' ').trim();
   text = text.replace(/^"(.*)"$/, '$1'); // the placeholder shows the task in quotes
-  return { category: cat, text: text.trim() };
+  return { category: cat, text: text.trim(), minutes: minutes };
+}
+
+// 25 -> "25m", 75 -> "1h 15m", 120 -> "2h"
+function formatMinutes(total) {
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return m + 'm';
+  return h + 'h' + (m ? ' ' + m + 'm' : '');
 }
 
 // ---------- Events ----------
@@ -205,6 +231,7 @@ form.addEventListener('submit', (e) => {
     id: Date.now().toString(36) + Math.random().toString(36).slice(2),
     text: parsed.text,
     category: typed ? canonicalCategory(typed) : '',
+    minutes: parsed.minutes,
     scope: scope,
     period: currentPeriod(),
     done: false,
