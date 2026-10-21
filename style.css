@@ -413,11 +413,6 @@ h2 {
   visibility: hidden; /* the pencil takes its place */
 }
 
-.side-item.dragging {
-  background: var(--card);
-  box-shadow: 0 8px 24px rgba(30, 40, 40, 0.18);
-}
-
 /* Name box that replaces the "+ Add category" button while typing (also used to rename) */
 #new-category,
 .rename-input {
@@ -705,6 +700,22 @@ h2 {
   color: var(--late);
 }
 
+/* With a mouse the x (and the category x) only show while hovering, like the pencil.
+   Touch screens cannot hover, so there they stay visible. */
+@media (hover: hover) and (pointer: fine) {
+  .delete,
+  .remove-cat {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .row:hover .delete,
+  .side-item:hover .remove-cat,
+  .delete:focus-visible {
+    opacity: 1;
+  }
+}
+
 /* Drag handle: touch-action none lets a finger drag it without scrolling the page */
 .handle {
   color: #c3c7ca;
@@ -713,8 +724,20 @@ h2 {
   user-select: none;
 }
 
-.row.dragging {
-  box-shadow: 0 8px 24px rgba(30, 40, 40, 0.18);
+/* The row being dragged follows the pointer (script.js sets its transform), lifted above the others.
+   pointer-events: none so the pointer can "see" the rows underneath it. */
+.row.dragging,
+.side-item.dragging {
+  position: relative;
+  z-index: 20;
+  pointer-events: none;
+  transition: none;
+  will-change: transform;
+  box-shadow: 0 10px 28px rgba(30, 40, 40, 0.2);
+}
+
+.side-item.dragging {
+  background: var(--card);
 }
 
 /* Unfinished tasks can be grabbed anywhere; the checkbox and x keep the normal pointer */

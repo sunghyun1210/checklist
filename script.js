@@ -858,12 +858,17 @@ groupsBox.addEventListener('dblclick', (e) => {
 // Drag to reorder (tasks and categories use the same code).
 // With a mouse you can grab the row anywhere; on a phone only the ≡ handle works,
 // because a finger on the row has to scroll the page.
+// The grabbed row follows the pointer, the other rows slide out of the way, and on release
+// the row slides into its place before the new order is saved.
 //   container   the element that holds the rows
 //   rowSelector which elements are the rows
 //   onDrop(list) is called with the list element after a drag, to save the new order
+const SLIDE_MS = 160;
+let dragLocked = false; // true while a dropped row is still sliding into place
+
 function enableDrag(container, rowSelector, onDrop) {
   container.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || dragLocked) return;
     const row = e.target.closest(rowSelector);
     if (!row || !container.contains(row)) return;
 
@@ -878,33 +883,66 @@ function enableDrag(container, rowSelector, onDrop) {
     const startX = e.clientX;
     const startY = e.clientY;
     let dragging = false;
+    let grabY = startY; // where the pointer was when the drag really started
+    let startTop = 0; // where the row was on screen at that moment
 
-    function begin() {
+    function begin(y) {
       dragging = true;
+      grabY = y;
+      startTop = row.getBoundingClientRect().top;
       row.classList.add('dragging');
       document.body.classList.add('drag-active'); // no text selection, grabbing cursor
       window.getSelection().removeAllRanges();
     }
 
-    if (onHandle) {
-      e.preventDefault();
-      begin(); // the handle starts right away
+    // Keep the grabbed row under the pointer, whatever its place in the list is
+    function follow(y) {
+      row.style.transform = 'none';
+      const natural = row.getBoundingClientRect().top;
+      row.style.transform = 'translateY(' + (startTop + (y - grabY) - natural) + 'px)';
     }
 
-    // While dragging, only move the row in the page; save when the mouse / finger is released.
+    // Put the grabbed row before / after `target`; the other rows slide to their new places
+    function moveRow(target, below) {
+      const others = [...list.children].filter((c) => c !== row);
+      const before = others.map((c) => c.getBoundingClientRect().top); // where they are now (even mid-slide)
+      others.forEach((c) => {
+        c.style.transition = 'none';
+        c.style.transform = '';
+      });
+
+      list.insertBefore(row, below ? target.nextSibling : target);
+
+      others.forEach((c, i) => {
+        const delta = before[i] - c.getBoundingClientRect().top;
+        if (!delta) return;
+        c.style.transform = 'translateY(' + delta + 'px)'; // start where it was...
+        c.getBoundingClientRect(); // (let the browser apply that first)
+        c.style.transition = 'transform ' + SLIDE_MS + 'ms ease';
+        c.style.transform = ''; // ...and slide to the new place
+      });
+    }
+
+    if (onHandle) {
+      e.preventDefault();
+      begin(startY); // the handle starts right away
+    }
+
     // The listeners are on document because moving the row in the DOM cancels pointer capture.
     function move(ev) {
       // Anywhere else: it is only a drag after the mouse moved a few pixels (so clicks still work)
       if (!dragging) {
         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
-        begin();
+        begin(ev.clientY);
       }
+
       const over = document.elementFromPoint(ev.clientX, ev.clientY);
       const target = over && over.closest(rowSelector);
-      if (!target || target === row || target.parentElement !== list) return;
-      const box = target.getBoundingClientRect();
-      const below = ev.clientY > box.top + box.height / 2;
-      list.insertBefore(row, below ? target.nextSibling : target);
+      if (target && target !== row && target.parentElement === list) {
+        const box = target.getBoundingClientRect();
+        moveRow(target, ev.clientY > box.top + box.height / 2);
+      }
+      follow(ev.clientY);
     }
 
     function end() {
@@ -922,7 +960,14 @@ function enableDrag(container, rowSelector, onDrop) {
       document.addEventListener('click', stopClick, { capture: true, once: true });
       setTimeout(() => document.removeEventListener('click', stopClick, true), 0);
 
-      onDrop(list); // saves, or just redraws when the order did not change
+      // Slide the row into its place, then save (saving redraws the list)
+      dragLocked = true;
+      row.style.transition = 'transform ' + SLIDE_MS + 'ms ease';
+      row.style.transform = 'none';
+      setTimeout(() => {
+        dragLocked = false;
+        onDrop(list); // saves, or just redraws when the order did not change
+      }, SLIDE_MS + 20);
     }
 
     document.addEventListener('pointermove', move);
