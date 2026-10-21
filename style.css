@@ -69,3 +69,51 @@ button {
   margin: 0;
   padding: 0;
 }
+
+/* Day / Week / Month tabs and previous/next bar */
+#scope-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+#scope-tabs button {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+}
+
+#scope-tabs button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+#period-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+#period-nav button {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+}
+
+#period-label {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+
+#list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
