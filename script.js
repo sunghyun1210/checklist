@@ -108,6 +108,7 @@ function cleanItem(it) {
     text: String(it.text || ''),
     category: typeof it.category === 'string' ? it.category : '',
     minutes: Number(it.minutes) || 0,
+    flagged: !!it.flagged,
     due: /^\d{4}-\d{2}-\d{2}$/.test(it.due) ? it.due : todayKey(),
     done: !!it.done,
     doneDate: it.done && typeof it.doneDate === 'string' ? it.doneDate : '',
@@ -203,8 +204,19 @@ function parseInput(raw) {
   let cat = '';
   let minutes = 0;
   let due = '';
+  let flagged = false;
 
-  let text = raw.replace(/(^|\s)@(\S+)/, (_, space, name) => {
+  // "!" at the very start ("!quiz", "! quiz") or as a word of its own ("quiz !") flags the task
+  let text = raw.replace(/^\s*!+\s*/, () => {
+    flagged = true;
+    return '';
+  });
+  text = text.replace(/(^|\s)!+(?=\s|$)/, (_, space) => {
+    flagged = true;
+    return space;
+  });
+
+  text = text.replace(/(^|\s)@(\S+)/, (_, space, name) => {
     cat = name; // only the first @word counts
     return space;
   });
@@ -225,7 +237,7 @@ function parseInput(raw) {
 
   text = text.replace(/\s+/g, ' ').trim();
   text = text.replace(/^"(.*)"$/, '$1'); // the placeholder shows the task in quotes
-  return { category: cat, text: text.trim(), minutes: minutes, due: due };
+  return { category: cat, text: text.trim(), minutes: minutes, due: due, flagged: flagged };
 }
 
 // 25 -> "25m", 75 -> "1h 15m", 120 -> "2h"
@@ -285,6 +297,7 @@ const SMART_TITLES = {
   today: 'Today',
   next: 'Next 7 days',
   overdue: 'Overdue',
+  flagged: 'Flagged',
   completed: 'Completed',
 };
 
@@ -296,6 +309,7 @@ function matchesSmart(kind, item) {
   if (kind === 'today') return item.due === key;
   if (kind === 'next') return !item.done && item.due > key && item.due <= dateKey(addDays(today, 7));
   if (kind === 'overdue') return !item.done && item.due < key;
+  if (kind === 'flagged') return !item.done && item.flagged;
   return item.done; // completed
 }
 
@@ -461,7 +475,7 @@ function renderHead() {
   tabs.innerHTML = '';
 
   // These lists only contain unfinished (or only finished) tasks, so All / To do would do nothing
-  tabs.hidden = view === 'checklist' && ['smart:next', 'smart:overdue', 'smart:completed'].includes(filter);
+  tabs.hidden = view === 'checklist' && ['smart:next', 'smart:overdue', 'smart:flagged', 'smart:completed'].includes(filter);
   options.forEach(([key, label]) => {
     const btn = el('button', current === key ? 'on' : '', label);
     btn.type = 'button';
@@ -509,12 +523,17 @@ function renderChecklist() {
       groups.push({ title: doneTitle(day), items: shown.filter((it) => it.doneDate === day) });
     });
   } else {
-    // Unfinished items that are past due go into one Overdue group on top
-    const overdue = shown.filter((it) => !it.done && it.due < today);
+    // Flagged tasks go to the very top, whatever their date is (like flagged mail)
+    const flaggedTasks = shown.filter((it) => it.flagged && !it.done);
+    if (flaggedTasks.length) groups.push({ title: 'Flagged', items: flaggedTasks, flag: true });
+    const others = shown.filter((it) => !flaggedTasks.includes(it));
+
+    // Unfinished items that are past due go into one Overdue group below that
+    const overdue = others.filter((it) => !it.done && it.due < today);
     if (overdue.length) groups.push({ title: 'Overdue', items: overdue, late: true });
 
     // Everything else is grouped by date, unfinished first and finished (faded) at the bottom
-    const rest = shown.filter((it) => !overdue.includes(it));
+    const rest = others.filter((it) => !overdue.includes(it));
     [...new Set(rest.map((it) => it.due))].sort().forEach((due) => {
       groups.push({
         title: groupTitle(due),
@@ -529,7 +548,8 @@ function renderChecklist() {
   groups.forEach((group) => {
     const section = el('section', 'group');
     if (group.date) section.dataset.date = group.date; // so the small calendar can scroll here
-    const heading = el('h3', group.late ? 'overdue' : '', group.title);
+    if (group.flag) section.classList.add('flagged-group');
+    const heading = el('h3', group.late ? 'overdue' : group.flag ? 'flagged' : '', group.title);
     if (group.late) {
       const move = el('button', 'move-all', 'Move all to today');
       move.type = 'button';
@@ -556,6 +576,7 @@ function makeRow(item) {
   const li = el('li', 'row');
   li.dataset.id = item.id;
   li.classList.toggle('done', item.done);
+  li.classList.toggle('flagged', item.flagged && !item.done);
 
   // Only unfinished items can be dragged
   if (!item.done) {
@@ -583,6 +604,16 @@ function makeRow(item) {
   meta.append(el('span', late ? 'pill late' : 'pill', dateLabel(item.due)));
   li.append(meta);
 
+  // Flag button: red and always visible when flagged, otherwise it shows while hovering
+  const flag = el('button', item.flagged ? 'flag on' : 'flag');
+  flag.type = 'button';
+  flag.setAttribute('aria-label', item.flagged ? 'Remove flag' : 'Flag');
+  flag.innerHTML =
+    '<svg viewBox="0 0 24 24" width="16" height="16" fill="' + (item.flagged ? 'currentColor' : 'none') +
+    '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>';
+  li.append(flag);
+
   const del = el('button', 'delete', '×');
   del.type = 'button';
   del.setAttribute('aria-label', 'Delete');
@@ -602,7 +633,12 @@ function weekTitle(start) {
 // A task shown inside a day, in its category color
 function makeEvent(item, showTime) {
   const ev = el('div', item.done ? 'ev done' : 'ev', item.text);
-  if (item.category) colorize(ev, item.category);
+  if (item.flagged && !item.done) {
+    ev.style.setProperty('--c', '#d0685a'); // flagged: red
+    ev.style.setProperty('--s', '#f8e3df');
+  } else if (item.category) {
+    colorize(ev, item.category);
+  }
   if (showTime && item.minutes) ev.append(el('em', '', formatMinutes(item.minutes)));
   return ev;
 }
@@ -702,6 +738,7 @@ function showPreview() {
   const box = $('preview');
   box.innerHTML = '';
 
+  if (parsed.flagged) box.append(el('span', 'pill late', 'Flagged'));
   if (parsed.category) {
     const pill = el('span', 'pill cat', '@' + parsed.category);
     colorize(pill, parsed.category);
@@ -860,6 +897,7 @@ form.addEventListener('submit', (e) => {
       text: parsed.text,
       category: cat ? canonicalCategory(cat) : '',
       minutes: parsed.minutes || Number($('chip-minutes').value),
+      flagged: parsed.flagged,
       due: parsed.due || $('chip-date').value || todayKey(),
       done: false,
       doneDate: '',
@@ -932,7 +970,7 @@ groupsBox.addEventListener('click', (e) => {
   if (e.target.matches('.move-all')) {
     change(() => {
       items.forEach((it) => {
-        if (!it.done && it.due < todayKey() && isVisible(it)) it.due = todayKey();
+        if (!it.done && !it.flagged && it.due < todayKey() && isVisible(it)) it.due = todayKey();
       });
     });
     return;
@@ -952,6 +990,10 @@ groupsBox.addEventListener('click', (e) => {
     change(() => {
       items = items.filter((it) => it !== item);
     });
+  } else if (e.target.closest('.flag')) {
+    change(() => {
+      item.flagged = !item.flagged;
+    });
   }
 });
 
@@ -964,6 +1006,7 @@ groupsBox.addEventListener('dblclick', (e) => {
   const edit = el('input', 'edit');
   edit.type = 'text';
   edit.value =
+    (item.flagged ? '! ' : '') +
     (item.category ? '@' + item.category + ' ' : '') +
     item.text +
     (item.minutes ? ' t' + item.minutes : '') +
@@ -997,6 +1040,7 @@ groupsBox.addEventListener('dblclick', (e) => {
         item.text = parsed.text;
         item.category = parsed.category ? canonicalCategory(parsed.category) : '';
         item.minutes = parsed.minutes;
+        item.flagged = parsed.flagged;
         if (parsed.due) item.due = parsed.due;
       });
     } else {
@@ -1035,7 +1079,7 @@ function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
     if (!onHandle) {
       if (e.pointerType === 'touch') return; // a finger scrolls; it uses the handle
       // Checkboxes, delete buttons and text boxes keep their normal behavior
-      if (e.target.closest('input, textarea, select, .delete, .remove-cat, .cat-edit')) return;
+      if (e.target.closest('input, textarea, select, .delete, .flag, .remove-cat, .cat-edit')) return;
     }
 
     const fromList = row.parentElement;
@@ -1142,7 +1186,9 @@ enableDrag(groupsBox, 'li.row:not(.done)', {
     const group = over && over.closest('.group');
     if (!group) return null;
     const ul = group.querySelector('ul');
-    if (ul !== row.parentElement && !group.dataset.date) return null; // not into Overdue
+    const toOtherGroup = ul !== row.parentElement;
+    if (toOtherGroup && !group.dataset.date) return null; // not into Flagged or Overdue (they are not dates)
+    if (toOtherGroup && row.closest('.group').classList.contains('flagged-group')) return null; // a flagged task stays up there
 
     const target = over.closest('li.row');
     if (target && target !== row) {

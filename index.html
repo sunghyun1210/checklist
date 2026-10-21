@@ -50,6 +50,10 @@
           <svg class="ic" style="color:#d0685a" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5M12 16h.01"/></svg>
           <span>Overdue</span><span class="side-count" data-smart="overdue"></span>
         </button>
+        <button type="button" class="side-item" data-filter="smart:flagged">
+          <svg class="ic" style="color:#d0685a" viewBox="0 0 24 24" width="17" height="17" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7" fill="none"/></svg>
+          <span>Flagged</span><span class="side-count" data-smart="flagged"></span>
+        </button>
         <button type="button" class="side-item" data-filter="smart:completed">
           <svg class="ic" style="color:#8a9096" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
           <span>Completed</span><span class="side-count" data-smart="completed"></span>
@@ -160,7 +164,7 @@
         <button type="submit">Add</button>
       </div>
       <p class="hint">
-        <b>@</b> picks a category (&uarr;&darr;, Enter or Tab) &middot; <b>t25</b> = 25 min &middot; <b>d10/25</b> &middot; <b>d+3</b> (3 days later)
+        <b>!</b> flags it (red, on top) &middot; <b>@</b> picks a category (&uarr;&darr;, Enter or Tab) &middot; <b>t25</b> = 25 min &middot; <b>d10/25</b> &middot; <b>d+3</b> (3 days later)
         &middot; <b>dtmr</b> (tomorrow) &middot; <b>dtdy</b> (today) &middot; <b>dmon</b> &middot; Enter adds, Esc closes
       </p>
     </form>

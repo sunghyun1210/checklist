@@ -749,6 +749,39 @@ h2 {
   }
 }
 
+/* Flag button on a task: red when flagged (always visible); otherwise it shows on hover with a mouse */
+.flag {
+  padding: 0 4px;
+  color: #c3c7ca;
+  line-height: 0;
+}
+
+.flag:hover,
+.flag.on {
+  color: var(--late);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .flag:not(.on) {
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .row:hover .flag,
+  .flag:focus-visible {
+    opacity: 1;
+  }
+}
+
+/* Flagged tasks: a red bar on the left edge, and a red group title */
+.row.flagged {
+  box-shadow: inset 3px 0 0 var(--late), var(--shadow);
+}
+
+.group h3.flagged {
+  color: var(--late);
+}
+
 /* Drag handle: touch-action none lets a finger drag it without scrolling the page */
 .handle {
   color: #c3c7ca;
