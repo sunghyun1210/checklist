@@ -18,6 +18,15 @@
   box-sizing: border-box;
 }
 
+/* No visible scrollbars anywhere (the wheel, trackpad and finger still scroll) */
+* {
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 /* Without this, display: flex/grid below would win over the hidden attribute */
 [hidden] {
   display: none !important;
@@ -87,6 +96,7 @@ h2 {
 }
 
 #today-date {
+  grid-column: 1;
   color: var(--text);
   font-size: 1.25rem;
   font-weight: 600;
@@ -129,7 +139,12 @@ h2 {
   font-weight: 600;
 }
 
+#main-tabs {
+  grid-column: 2;
+}
+
 #new-task {
+  grid-column: 3;
   justify-self: end;
   box-shadow: 0 4px 14px rgba(95, 143, 135, 0.35);
 }
@@ -290,79 +305,6 @@ h2 {
   display: block;
 }
 
-/* Small month calendar in the right column, under the numbers */
-#minical {
-  padding: 12px 10px 10px;
-  border-radius: var(--radius);
-  background: var(--card);
-  box-shadow: var(--shadow);
-}
-
-#mini-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 0 4px 6px;
-  font-size: 0.9rem;
-}
-
-#mini-head button {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: var(--muted);
-  font-size: 17px;
-  line-height: 1;
-}
-
-#mini-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
-  text-align: center;
-}
-
-#mini-grid span,
-#mini-grid button {
-  position: relative;
-  display: grid;
-  place-items: center;
-  height: 32px;
-  border-radius: 50%;
-  font-size: 0.85rem;
-}
-
-#mini-grid span {
-  color: var(--muted);
-  font-size: 0.62rem;
-  font-weight: 600;
-}
-
-#mini-grid button.other {
-  opacity: 0.35;
-}
-
-#mini-grid button.today {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 600;
-}
-
-/* A dot under a day that has tasks */
-#mini-grid button.has::after {
-  content: "";
-  position: absolute;
-  bottom: 1px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-}
-
-#mini-grid button.today.has::after {
-  background: #fff;
-}
-
 /* Category rows: a drag handle on the left and a pencil on the right, both only while hovering */
 #category-list .side-item {
   position: relative;
@@ -502,30 +444,17 @@ h2 {
   flex-direction: column;
 }
 
-#head {
+/* The four numbers sit at the top of the list column and share its width */
+#stats {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  gap: 8px;
   margin-bottom: 14px;
 }
 
-#stats {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.vrule {
-  width: 1px;
-  height: 30px;
-  margin-right: 8px;
-  background: var(--line);
-}
-
 .stat {
-  min-width: 84px;
-  padding: 5px 14px 6px;
+  flex: 1;
+  min-width: 0;
+  padding: 5px 12px 6px;
   border-radius: 14px;
   background: var(--card);
   box-shadow: var(--shadow);
@@ -559,35 +488,82 @@ h2 {
   color: var(--accent);
 }
 
-/* ---------- Checklist view ---------- */
+/* ---------- Wide screens: calendar | divider | numbers and task list ---------- */
 
-/* Two columns: the task list, and a narrow column on the right for the small calendar */
-#checklist-view {
+#split {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(250px, 24vw, 320px);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 1px 380px;
+  gap: 22px;
 }
 
-/* Only the list scrolls; the calendar stays where it is */
+#divider {
+  background: var(--line);
+}
+
+#cal-pane,
+#list-pane {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#sub-tabs {
+  align-self: flex-start;
+  margin-bottom: 10px;
+}
+
+/* Only the list scrolls */
 #list-col {
+  flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 2px 2px 8px;
 }
 
-#right-col {
-  align-self: start;
-}
-
-/* Not enough width for a second column */
-@media (max-width: 880px) {
-  #checklist-view {
-    grid-template-columns: minmax(0, 1fr);
+/* The list column is narrow here: the labels go under the title, like on a phone */
+@media (min-width: 1151px) {
+  #main-tabs {
+    display: none; /* one screen shows both */
   }
 
-  #right-col {
+  #list-pane .row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    padding: 10px 12px;
+  }
+
+  #list-pane .meta {
+    order: 1;
+    flex: 0 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-left: 50px;
+  }
+}
+
+/* Narrower windows: one pane at a time, chosen with the tabs at the top */
+@media (max-width: 1150px) {
+  #split {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  #divider {
+    display: none;
+  }
+
+  #cal-pane,
+  #list-pane {
+    flex: 1;
+  }
+
+  #split[data-pane="calendar"] #list-pane,
+  #split[data-pane="list"] #cal-pane {
     display: none;
   }
 }
@@ -862,18 +838,25 @@ body.drag-active * {
 
 /* ---------- Calendar ---------- */
 
-#calendar-view {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 #cal-nav {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+
+/* Monthly | Weekly: right end of the header, above the last weekday */
+#cal-mode {
+  margin-left: auto;
+}
+
+/* A task dragged from the list over a day: that day lights up */
+.cell.drop-target,
+.col.drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: #eef5f3;
 }
 
 /* Arrows and Today sit right next to the month / week title */
@@ -1290,8 +1273,7 @@ dialog::backdrop {
     margin-bottom: 0;
   }
 
-  #search kbd,
-  #minical {
+  #search kbd {
     display: none;
   }
 
@@ -1331,30 +1313,15 @@ dialog::backdrop {
     left: 68px;
   }
 
-  #head {
-    flex-wrap: wrap;
-  }
-
-  #stats {
-    width: 100%;
-  }
-
-  .vrule {
-    display: none;
-  }
-
   .stat {
-    flex: 1;
-    min-width: 0;
     padding: 5px 8px 6px;
   }
 
-  #checklist-view {
+  #split {
     display: block;
   }
 
-  #list-col,
-  #calendar-view {
+  #list-col {
     overflow: visible;
   }
 

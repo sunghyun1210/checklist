@@ -90,55 +90,44 @@
     </aside>
 
     <main id="content">
-      <!-- Sub toolbar: tabs on the left, numbers on the right -->
-      <div id="head">
-        <nav id="sub-tabs" class="seg small"></nav>
-        <div id="stats">
-          <span class="vrule"></span>
-          <div class="stat"><small>Due today</small><b id="sum-today"></b></div>
-          <div class="stat"><small>This week</small><b id="sum-week"></b></div>
-          <div class="stat"><small>Late</small><b id="sum-late"></b></div>
-          <div class="stat"><small>Done</small><b id="sum-done"></b></div>
-        </div>
-      </div>
-
-      <!-- Two columns: the task list (scrolls) and, on the right, the small calendar -->
-      <section id="checklist-view">
-        <div id="list-col">
-          <h2 id="view-title"></h2>
-          <div id="groups"></div>
-
-          <div id="footer" hidden>
-            <span id="count"></span>
-            <button type="button" id="clear-done">Clear completed</button>
+      <!-- Wide screens: calendar | divider | numbers and task list.
+           Narrow screens show one at a time (the two tabs at the top). -->
+      <div id="split" data-pane="list">
+        <section id="cal-pane">
+          <div id="cal-nav">
+            <button type="button" class="round" id="cal-prev" aria-label="Previous">&lsaquo;</button>
+            <h2 id="cal-title"></h2>
+            <button type="button" class="round" id="cal-next" aria-label="Next">&rsaquo;</button>
+            <button type="button" id="cal-today">Today</button>
+            <nav id="cal-mode" class="seg small"></nav>
           </div>
-        </div>
+          <div id="cal-month" class="month"></div>
+          <div id="cal-week" class="week" hidden></div>
+        </section>
 
-        <aside id="right-col">
-          <!-- Small month: click a day to jump there (or to add a task on an empty day) -->
-          <div id="minical">
-            <div id="mini-head">
-              <b id="mini-title"></b>
-              <span>
-                <button type="button" id="mini-prev" aria-label="Previous month">&lsaquo;</button>
-                <button type="button" id="mini-next" aria-label="Next month">&rsaquo;</button>
-              </span>
+        <div id="divider"></div>
+
+        <section id="list-pane">
+          <div id="stats">
+            <div class="stat"><small>Due today</small><b id="sum-today"></b></div>
+            <div class="stat"><small>This week</small><b id="sum-week"></b></div>
+            <div class="stat"><small>Late</small><b id="sum-late"></b></div>
+            <div class="stat"><small>Done</small><b id="sum-done"></b></div>
+          </div>
+
+          <nav id="sub-tabs" class="seg small"></nav>
+
+          <div id="list-col">
+            <h2 id="view-title"></h2>
+            <div id="groups"></div>
+
+            <div id="footer" hidden>
+              <span id="count"></span>
+              <button type="button" id="clear-done">Clear completed</button>
             </div>
-            <div id="mini-grid"></div>
           </div>
-        </aside>
-      </section>
-
-      <section id="calendar-view" hidden>
-        <div id="cal-nav">
-          <button type="button" class="round" id="cal-prev" aria-label="Previous">&lsaquo;</button>
-          <h2 id="cal-title"></h2>
-          <button type="button" class="round" id="cal-next" aria-label="Next">&rsaquo;</button>
-          <button type="button" id="cal-today">Today</button>
-        </div>
-        <div id="cal-month" class="month"></div>
-        <div id="cal-week" class="week" hidden></div>
-      </section>
+        </section>
+      </div>
     </main>
   </div>
 

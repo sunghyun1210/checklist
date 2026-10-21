@@ -29,7 +29,6 @@ let calMode = 'month'; // calendar: 'month' | 'week'
 let filter = '';
 let query = ''; // text typed in the search box (lowercase)
 let calDate = new Date(); // any day inside the month / week shown in the calendar
-let miniMonth = new Date(); // month shown in the small calendar in the sidebar
 let undoStack = []; // older versions of `items` (as JSON text), newest last
 let redoStack = []; // versions that were undone
 
@@ -354,21 +353,16 @@ function render() {
     btn.classList.toggle('on', btn.dataset.view === view);
   });
 
-  const calendar = view === 'calendar';
-  $('checklist-view').hidden = calendar;
-  $('calendar-view').hidden = !calendar;
+  // Wide screens show both panes; on narrow ones the CSS shows only the pane that is picked here
+  $('split').dataset.pane = view === 'calendar' ? 'calendar' : 'list';
 
   $('undo').disabled = !undoStack.length;
   $('redo').disabled = !redoStack.length;
 
   renderSidebar();
-  renderMiniCalendar();
   renderHead();
-  if (calendar) {
-    renderCalendar();
-  } else {
-    renderChecklist();
-  }
+  renderCalendar();
+  renderChecklist();
 }
 
 function renderSidebar() {
@@ -432,55 +426,30 @@ function renderSidebar() {
   });
 }
 
-// Small month in the sidebar: a dot under every day that has tasks
-function renderMiniCalendar() {
-  const first = new Date(miniMonth.getFullYear(), miniMonth.getMonth(), 1);
-  const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-  const weeks = Math.ceil((first.getDay() + daysInMonth) / 7);
-  const start = addDays(first, -first.getDay());
-  $('mini-title').textContent = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  const grid = $('mini-grid');
-  grid.innerHTML = '';
-  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((letter) => grid.append(el('span', '', letter)));
-
-  const withTasks = new Set(items.map((it) => it.due));
-  const today = todayKey();
-  for (let i = 0; i < weeks * 7; i++) {
-    const day = addDays(start, i);
-    const key = dateKey(day);
-    const classes = [];
-    if (day.getMonth() !== first.getMonth()) classes.push('other');
-    if (key === today) classes.push('today');
-    if (withTasks.has(key)) classes.push('has');
-
-    const btn = el('button', classes.join(' '), String(day.getDate()));
-    btn.type = 'button';
-    btn.dataset.day = key;
-    grid.append(btn);
-  }
-}
-
-// Sub toolbar: the tabs depend on the main tab; the four numbers always count everything.
+// Tabs above the list (All / To do), the Monthly / Weekly switch of the calendar, and the four numbers,
+// which always count everything.
 // Late items are not counted in "Due today" / "This week" (they have their own number),
 // and "Done" is only what was finished today, so it starts from 0 again every day.
 function renderHead() {
-  const options =
-    view === 'checklist'
-      ? [['all', 'All'], ['todo', 'To do']]
-      : [['week', 'Weekly'], ['month', 'Monthly']];
-  const current = view === 'checklist' ? subList : calMode;
-
   const tabs = $('sub-tabs');
   tabs.innerHTML = '';
 
   // These lists only contain unfinished (or only finished) tasks, so All / To do would do nothing
-  tabs.hidden = view === 'checklist' && ['smart:next', 'smart:overdue', 'smart:flagged', 'smart:completed'].includes(filter);
-  options.forEach(([key, label]) => {
-    const btn = el('button', current === key ? 'on' : '', label);
+  tabs.hidden = ['smart:next', 'smart:overdue', 'smart:flagged', 'smart:completed'].includes(filter);
+  [['all', 'All'], ['todo', 'To do']].forEach(([key, label]) => {
+    const btn = el('button', subList === key ? 'on' : '', label);
     btn.type = 'button';
     btn.dataset.sub = key;
     tabs.append(btn);
+  });
+
+  const modes = $('cal-mode');
+  modes.innerHTML = '';
+  [['month', 'Monthly'], ['week', 'Weekly']].forEach(([key, label]) => {
+    const btn = el('button', calMode === key ? 'on' : '', label);
+    btn.type = 'button';
+    btn.dataset.mode = key;
+    modes.append(btn);
   });
 
   const mine = items; // always everything: the numbers do not change with the sidebar filter or search
@@ -570,24 +539,7 @@ function renderChecklist() {
   $('count').textContent = text;
   $('footer').hidden = shown.length === 0 && hiddenOld === 0;
   $('clear-done').hidden = !shown.some((it) => it.done); // nothing finished is shown: nothing to clear
-
-  alignRightColumn();
 }
-
-// Push the small calendar down so its top is level with the first task card
-// (the title and the first group heading are above that card).
-function alignRightColumn() {
-  const view = $('checklist-view');
-  if (view.hidden) return; // nothing to measure while the calendar tab is open
-  const first = $('groups').querySelector('li.row');
-  const offset = first
-    ? first.getBoundingClientRect().top - view.getBoundingClientRect().top + $('list-col').scrollTop
-    : 0;
-  $('right-col').style.paddingTop = Math.max(0, offset) + 'px';
-}
-
-// The title can wrap on a narrow window, so measure again when the window changes size
-window.addEventListener('resize', alignRightColumn);
 
 function makeRow(item) {
   const li = el('li', 'row');
@@ -733,6 +685,7 @@ const input = $('new-item');
 
 // date: optional 'YYYY-MM-DD' to start with (default is today)
 function openTaskDialog(date) {
+  dialog.dataset.openedAt = Date.now();
   const names = categoryNames();
   const select = $('chip-category');
   select.innerHTML = '';
@@ -897,7 +850,8 @@ document.addEventListener('keydown', (e) => {
 // Click on the dark area around a popup closes it (Esc works by default)
 document.querySelectorAll('dialog').forEach((d) => {
   d.addEventListener('click', (e) => {
-    if (e.target === d) d.close();
+    // (not within 0.4 s of opening: that would be the second click of a double-click on a calendar day)
+    if (e.target === d && Date.now() - Number(d.dataset.openedAt || 0) > 400) d.close();
   });
 });
 
@@ -1083,10 +1037,11 @@ groupsBox.addEventListener('dblclick', (e) => {
 //   locate(over, event, row)  where the grabbed row goes while the pointer is over `over`:
 //                { list, ref } = inside `list`, before `ref` (null = at the end), or null = nowhere
 //   onDrop(list, fromList, row)  save the result; `list` is where the row ended up
+//   dropOn(over) / onDropOn(target, row)  optional: elements the row can be dropped ON (and what to save then)
 const SLIDE_MS = 160;
 let dragLocked = false; // true while a dropped row is still sliding into place
 
-function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
+function enableDrag(container, rowSelector, { moving, locate, onDrop, dropOn, onDropOn }) {
   container.addEventListener('pointerdown', (e) => {
     if (e.button !== 0 || dragLocked) return;
     const row = e.target.closest(rowSelector);
@@ -1105,9 +1060,12 @@ function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
     let dragging = false;
     let grabY = startY; // where the pointer was when the drag really started
     let startTop = 0; // where the row was on screen at that moment
+    let grabX = startX;
+    let zone = null; // a drop target (a calendar day) the pointer is over right now
 
-    function begin(y) {
+    function begin(x, y) {
       dragging = true;
+      grabX = x;
       grabY = y;
       startTop = row.getBoundingClientRect().top;
       row.classList.add('dragging');
@@ -1115,11 +1073,15 @@ function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
       window.getSelection().removeAllRanges();
     }
 
-    // Keep the grabbed row under the pointer, whatever its place in the list is
-    function follow(y) {
+    // Keep the grabbed row under the pointer, whatever its place in the list is.
+    // It only follows sideways once the pointer has left the list (over a calendar day).
+    function follow(x, y) {
       row.style.transform = 'none';
       const natural = row.getBoundingClientRect().top;
-      row.style.transform = 'translateY(' + (startTop + (y - grabY) - natural) + 'px)';
+      const box = container.getBoundingClientRect();
+      const away = zone || x < box.left || x > box.right;
+      row.style.transform =
+        'translate(' + (away ? x - grabX : 0) + 'px, ' + (startTop + (y - grabY) - natural) + 'px)';
     }
 
     // Put the grabbed row into `list` before `ref`; everything else slides to its new place
@@ -1147,7 +1109,7 @@ function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
 
     if (onHandle) {
       e.preventDefault();
-      begin(startY); // the handle starts right away
+      begin(startX, startY); // the handle starts right away
     }
 
     // The listeners are on document because moving the row in the DOM cancels pointer capture.
@@ -1155,12 +1117,21 @@ function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
       // Anywhere else: it is only a drag after the mouse moved a few pixels (so clicks still work)
       if (!dragging) {
         if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
-        begin(ev.clientY);
+        begin(ev.clientX, ev.clientY);
       }
 
-      const spot = locate(document.elementFromPoint(ev.clientX, ev.clientY), ev, row);
-      if (spot) moveRow(spot.list, spot.ref);
-      follow(ev.clientY);
+      const over = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = dropOn ? dropOn(over) : null;
+      if (target !== zone) {
+        if (zone) zone.classList.remove('drop-target');
+        if (target) target.classList.add('drop-target');
+        zone = target;
+      }
+      if (!zone) {
+        const spot = locate(over, ev, row);
+        if (spot) moveRow(spot.list, spot.ref);
+      }
+      follow(ev.clientX, ev.clientY);
     }
 
     function end() {
@@ -1177,6 +1148,15 @@ function enableDrag(container, rowSelector, { moving, locate, onDrop }) {
       };
       document.addEventListener('click', stopClick, { capture: true, once: true });
       setTimeout(() => document.removeEventListener('click', stopClick, true), 0);
+
+      // Released over a drop target (a calendar day): save that instead of a new place in the list
+      if (zone) {
+        const target = zone;
+        zone.classList.remove('drop-target');
+        zone = null;
+        onDropOn(target, row);
+        return;
+      }
 
       // Slide the row into its place, then save (saving redraws the list)
       dragLocked = true;
@@ -1217,6 +1197,19 @@ enableDrag(groupsBox, 'li.row:not(.done)', {
     // Over the heading of a group: the top of that group
     if (!target && over.closest('h3')) return { list: ul, ref: ul.firstChild };
     return null;
+  },
+
+  // Drop a task on a day of the calendar to give it that date
+  dropOn(over) {
+    return over && over.closest('.cell[data-date], .col[data-date]');
+  },
+
+  onDropOn(target, row) {
+    const date = target.dataset.date;
+    const id = row.dataset.id;
+    change(() => {
+      items.find((it) => it.id === id).due = date;
+    });
   },
 
   onDrop(list, fromList, row) {
@@ -1286,11 +1279,14 @@ $('main-tabs').addEventListener('click', (e) => {
 $('sub-tabs').addEventListener('click', (e) => {
   const key = e.target.dataset.sub;
   if (!key) return;
-  if (view === 'checklist') {
-    subList = key;
-  } else {
-    calMode = key;
-  }
+  subList = key;
+  render();
+});
+
+$('cal-mode').addEventListener('click', (e) => {
+  const key = e.target.dataset.mode;
+  if (!key) return;
+  calMode = key;
   render();
 });
 
@@ -1585,38 +1581,6 @@ document.addEventListener('keydown', (e) => {
   searchBox.focus();
 });
 
-// Small calendar: previous / next month, and click a day to jump there
-$('mini-prev').addEventListener('click', () => {
-  miniMonth = new Date(miniMonth.getFullYear(), miniMonth.getMonth() - 1, 1);
-  renderMiniCalendar();
-});
-
-$('mini-next').addEventListener('click', () => {
-  miniMonth = new Date(miniMonth.getFullYear(), miniMonth.getMonth() + 1, 1);
-  renderMiniCalendar();
-});
-
-$('mini-grid').addEventListener('click', (e) => {
-  const key = e.target.dataset.day;
-  if (!key) return;
-  if (view === 'calendar') {
-    calDate = fromKey(key); // the month / week of that day
-    render();
-  } else {
-    // Checklist: scroll to that day's group and flash it (so it shows even when the whole list fits
-    // on the screen). A day with no tasks opens the New task popup for that date.
-    const group = document.querySelector('#groups [data-date="' + key + '"]');
-    if (group) {
-      group.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      group.classList.remove('flash');
-      void group.offsetWidth; // restart the animation when the same day is clicked again
-      group.classList.add('flash');
-    } else {
-      openTaskDialog(key);
-    }
-  }
-});
-
 // Previous / next moves by a month or a week, depending on the calendar tab
 function shiftCalendar(dir) {
   if (calMode === 'week') {
@@ -1635,8 +1599,28 @@ $('cal-today').addEventListener('click', () => {
   render();
 });
 
-// Click an empty spot of a day to add a task on that date
-$('calendar-view').addEventListener('click', (e) => {
+// Scroll the list to a day's group and flash it (so it shows even when the whole list fits on the screen).
+// Returns false when that day has no group in the list.
+function showDayInList(key) {
+  const group = document.querySelector('#groups [data-date="' + key + '"]');
+  if (!group) return false;
+  group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  group.classList.remove('flash');
+  void group.offsetWidth; // restart the animation when the same day is clicked again
+  group.classList.add('flash');
+  return true;
+}
+
+// Click a day: the list jumps to that day. A day with no tasks (or a narrow screen where the list is
+// hidden) opens the New task popup for that date. Double-click always opens the popup.
+$('cal-pane').addEventListener('click', (e) => {
+  const day = e.target.closest('[data-date]');
+  if (!day) return;
+  const listShown = getComputedStyle($('list-pane')).display !== 'none';
+  if (!(listShown && showDayInList(day.dataset.date))) openTaskDialog(day.dataset.date);
+});
+
+$('cal-pane').addEventListener('dblclick', (e) => {
   const day = e.target.closest('[data-date]');
   if (day) openTaskDialog(day.dataset.date);
 });
