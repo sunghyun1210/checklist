@@ -290,10 +290,9 @@ h2 {
   display: block;
 }
 
-/* Small month calendar above Settings */
+/* Small month calendar in the right column, under the numbers */
 #minical {
-  margin-top: auto;
-  padding: 10px 8px 8px;
+  padding: 12px 10px 10px;
   border-radius: var(--radius);
   background: var(--card);
   box-shadow: var(--shadow);
@@ -328,9 +327,9 @@ h2 {
   position: relative;
   display: grid;
   place-items: center;
-  height: 26px;
+  height: 32px;
   border-radius: 50%;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 #mini-grid span {
@@ -362,17 +361,6 @@ h2 {
 
 #mini-grid button.today.has::after {
   background: #fff;
-}
-
-/* Not enough height for the small calendar: hide it */
-@media (max-height: 840px) {
-  #minical {
-    display: none;
-  }
-
-  #sidebar-bottom {
-    margin-top: auto; /* Settings goes back to the very bottom */
-  }
 }
 
 /* Category rows: a drag handle on the left and a pencil on the right, both only while hovering */
@@ -479,7 +467,7 @@ h2 {
 
 /* margin-top: auto pushes this row to the very bottom of the sidebar */
 #sidebar-bottom {
-  margin-top: 12px; /* the small calendar above takes the free space (margin-top: auto) */
+  margin-top: auto;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -573,11 +561,35 @@ h2 {
 
 /* ---------- Checklist view ---------- */
 
+/* Two columns: the task list, and a narrow column on the right for the small calendar */
 #checklist-view {
   flex: 1;
   min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(250px, 24vw, 320px);
+  gap: 20px;
+}
+
+/* Only the list scrolls; the calendar stays where it is */
+#list-col {
+  min-height: 0;
   overflow-y: auto;
   padding: 2px 2px 8px;
+}
+
+#right-col {
+  align-self: start;
+}
+
+/* Not enough width for a second column */
+@media (max-width: 880px) {
+  #checklist-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  #right-col {
+    display: none;
+  }
 }
 
 #view-title {
@@ -1337,7 +1349,11 @@ dialog::backdrop {
     padding: 5px 8px 6px;
   }
 
-  #checklist-view,
+  #checklist-view {
+    display: block;
+  }
+
+  #list-col,
   #calendar-view {
     overflow: visible;
   }

@@ -11,7 +11,7 @@
   <header id="topbar">
     <div id="today-date"></div>
     <nav id="main-tabs" class="seg">
-      <button type="button" data-view="checklist">Checklist</button>
+      <button type="button" data-view="checklist">Dashboard</button>
       <button type="button" data-view="calendar">Calendar</button>
     </nav>
     <button type="button" id="new-task">+ New task <kbd>&#8679;A</kbd></button>
@@ -74,18 +74,6 @@
         </div>
       </section>
 
-      <!-- Small month: click a day to jump there (hidden when the window is short) -->
-      <div id="minical">
-        <div id="mini-head">
-          <b id="mini-title"></b>
-          <span>
-            <button type="button" id="mini-prev" aria-label="Previous month">&lsaquo;</button>
-            <button type="button" id="mini-next" aria-label="Next month">&rsaquo;</button>
-          </span>
-        </div>
-        <div id="mini-grid"></div>
-      </div>
-
       <!-- Bottom left: settings, with the undo / redo buttons next to it -->
       <div id="sidebar-bottom">
         <button type="button" class="side-item" id="open-settings">
@@ -114,14 +102,31 @@
         </div>
       </div>
 
+      <!-- Two columns: the task list (scrolls) and, on the right, the small calendar -->
       <section id="checklist-view">
-        <h2 id="view-title"></h2>
-        <div id="groups"></div>
+        <div id="list-col">
+          <h2 id="view-title"></h2>
+          <div id="groups"></div>
 
-        <div id="footer" hidden>
-          <span id="count"></span>
-          <button type="button" id="clear-done">Clear completed</button>
+          <div id="footer" hidden>
+            <span id="count"></span>
+            <button type="button" id="clear-done">Clear completed</button>
+          </div>
         </div>
+
+        <aside id="right-col">
+          <!-- Small month: click a day to jump there (or to add a task on an empty day) -->
+          <div id="minical">
+            <div id="mini-head">
+              <b id="mini-title"></b>
+              <span>
+                <button type="button" id="mini-prev" aria-label="Previous month">&lsaquo;</button>
+                <button type="button" id="mini-next" aria-label="Next month">&rsaquo;</button>
+              </span>
+            </div>
+            <div id="mini-grid"></div>
+          </div>
+        </aside>
       </section>
 
       <section id="calendar-view" hidden>
