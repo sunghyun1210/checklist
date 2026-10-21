@@ -570,7 +570,24 @@ function renderChecklist() {
   $('count').textContent = text;
   $('footer').hidden = shown.length === 0 && hiddenOld === 0;
   $('clear-done').hidden = !shown.some((it) => it.done); // nothing finished is shown: nothing to clear
+
+  alignRightColumn();
 }
+
+// Push the small calendar down so its top is level with the first task card
+// (the title and the first group heading are above that card).
+function alignRightColumn() {
+  const view = $('checklist-view');
+  if (view.hidden) return; // nothing to measure while the calendar tab is open
+  const first = $('groups').querySelector('li.row');
+  const offset = first
+    ? first.getBoundingClientRect().top - view.getBoundingClientRect().top + $('list-col').scrollTop
+    : 0;
+  $('right-col').style.paddingTop = Math.max(0, offset) + 'px';
+}
+
+// The title can wrap on a narrow window, so measure again when the window changes size
+window.addEventListener('resize', alignRightColumn);
 
 function makeRow(item) {
   const li = el('li', 'row');
