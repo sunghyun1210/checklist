@@ -426,6 +426,9 @@ function renderHead() {
 
   const tabs = $('sub-tabs');
   tabs.innerHTML = '';
+
+  // These lists only contain unfinished (or only finished) tasks, so All / To do would do nothing
+  tabs.hidden = view === 'checklist' && ['smart:next', 'smart:overdue', 'smart:completed'].includes(filter);
   options.forEach(([key, label]) => {
     const btn = el('button', current === key ? 'on' : '', label);
     btn.type = 'button';
@@ -503,7 +506,7 @@ function renderChecklist() {
   if (minutesLeft) text += ' · ' + formatMinutes(minutesLeft);
   $('count').textContent = text;
   $('footer').hidden = shown.length === 0;
-  $('clear-done').hidden = subList === 'todo'; // nothing finished is shown there
+  $('clear-done').hidden = !shown.some((it) => it.done); // nothing finished is shown: nothing to clear
 }
 
 function makeRow(item) {
