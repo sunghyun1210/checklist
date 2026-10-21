@@ -24,6 +24,7 @@
       </button>
       <h2 class="side-heading">Categories</h2>
       <div id="category-list"></div>
+      <button type="button" class="side-item" id="open-settings">Settings</button>
     </aside>
 
     <main id="content">
@@ -84,6 +85,19 @@
         <button type="submit">Add</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Settings popup -->
+  <dialog id="settings-dialog">
+    <div class="dialog-body">
+      <h2>Settings</h2>
+      <p class="hint">Your tasks are saved only in this browser. Export a backup once in a while.</p>
+      <button type="button" id="export">Export backup</button>
+      <button type="button" id="import">Import backup</button>
+      <input type="file" id="import-file" accept="application/json" hidden>
+      <button type="button" id="clear-all" class="danger">Clear all data</button>
+      <button type="button" id="close-settings">Close</button>
+    </div>
   </dialog>
 
   <script src="script.js"></script>

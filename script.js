@@ -395,9 +395,11 @@ function openTaskDialog(date) {
 
 $('new-task').addEventListener('click', () => openTaskDialog());
 
-// Click on the dark area around the popup closes it (Esc works by default)
-dialog.addEventListener('click', (e) => {
-  if (e.target === dialog) dialog.close();
+// Click on the dark area around a popup closes it (Esc works by default)
+document.querySelectorAll('dialog').forEach((d) => {
+  d.addEventListener('click', (e) => {
+    if (e.target === d) d.close();
+  });
 });
 
 form.addEventListener('submit', (e) => {
@@ -419,6 +421,52 @@ form.addEventListener('submit', (e) => {
   saveItems();
 
   dialog.close();
+  render();
+});
+
+// ---------- Settings: backup and reset ----------
+
+const settings = $('settings-dialog');
+
+$('open-settings').addEventListener('click', () => settings.showModal());
+$('close-settings').addEventListener('click', () => settings.close());
+
+// Download all items as a JSON file
+$('export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'checklist-backup.json';
+  link.click();
+  URL.revokeObjectURL(link.href);
+});
+
+// Pick a backup file and replace the current items with it
+$('import').addEventListener('click', () => $('import-file').click());
+
+$('import-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = ''; // so the same file can be picked again
+  if (!file) return;
+
+  try {
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data)) throw new Error('not a list');
+    if (!confirm('Replace all current tasks with this backup?')) return;
+    items = data.filter((it) => it && typeof it.text === 'string').map(cleanItem);
+    saveItems();
+    settings.close();
+    render();
+  } catch (err) {
+    alert('That file is not a valid backup.');
+  }
+});
+
+$('clear-all').addEventListener('click', () => {
+  if (!confirm('Delete all tasks? This cannot be undone.')) return;
+  items = [];
+  saveItems();
+  settings.close();
   render();
 });
 
