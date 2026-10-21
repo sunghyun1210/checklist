@@ -408,15 +408,11 @@ function renderSidebar() {
       '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
     btn.append(edit);
 
-    // A saved category with no tasks at all can be removed again
-    const used = items.some((it) => it.category.toLowerCase() === name.toLowerCase());
-    if (!used) {
-      const remove = el('span', 'remove-cat', '×');
-      remove.dataset.name = name;
-      remove.setAttribute('aria-label', 'Remove category');
-      btn.append(remove);
-      btn.classList.add('has-remove');
-    }
+    // x (shows on hover): delete the category
+    const remove = el('span', 'remove-cat', '×');
+    remove.dataset.name = name;
+    remove.setAttribute('aria-label', 'Delete category');
+    btn.append(remove);
     list.append(btn);
   });
 }
@@ -1317,7 +1313,24 @@ $('category-list').addEventListener('dblclick', (e) => {
   if (row) startRename(row);
 });
 
-// Phone: press and hold a category (half a second) for a menu to rename it or move it.
+// Delete a category. Its tasks are kept, they just lose the category (asks first when there are any).
+// Ctrl+Z brings everything back.
+function deleteCategory(name) {
+  const lower = name.toLowerCase();
+  const count = items.filter((it) => it.category.toLowerCase() === lower).length;
+  if (count) {
+    const tasks = count === 1 ? '1 task stays' : count + ' tasks stay';
+    if (!confirm('Delete the category "' + name + '"?\n' + tasks + ', without a category.')) return;
+  }
+  change(() => {
+    savedCategories = savedCategories.filter((n) => n.toLowerCase() !== lower);
+    items.forEach((it) => {
+      if (it.category.toLowerCase() === lower) it.category = '';
+    });
+  });
+}
+
+// Phone: press and hold a category (half a second) for a menu to rename it, move it or delete it.
 // (On a computer the pencil, double-click and dragging do the same.)
 const categoryDialog = $('category-dialog');
 let menuCategory = ''; // the category the menu is about
@@ -1352,6 +1365,10 @@ function moveMenuCategory(dir) {
 $('cat-earlier').addEventListener('click', () => moveMenuCategory(-1));
 $('cat-later').addEventListener('click', () => moveMenuCategory(1));
 $('cat-close').addEventListener('click', () => categoryDialog.close());
+$('cat-delete').addEventListener('click', () => {
+  categoryDialog.close();
+  deleteCategory(menuCategory);
+});
 $('cat-rename').addEventListener('click', () => {
   categoryDialog.close();
   const row = [...document.querySelectorAll('#category-list .side-item')].find((b) => b.dataset.name === menuCategory);
@@ -1455,9 +1472,7 @@ $('sidebar').addEventListener('click', (e) => {
 
   const remove = e.target.closest('.remove-cat');
   if (remove) {
-    change(() => {
-      savedCategories = savedCategories.filter((n) => n.toLowerCase() !== remove.dataset.name.toLowerCase());
-    });
+    deleteCategory(remove.dataset.name);
     return;
   }
 
@@ -1524,9 +1539,17 @@ $('mini-grid').addEventListener('click', (e) => {
     calDate = fromKey(key); // the month / week of that day
     render();
   } else {
-    // Checklist: scroll to that day's group (nothing happens when it has no tasks)
+    // Checklist: scroll to that day's group and flash it (so it shows even when the whole list fits
+    // on the screen). A day with no tasks opens the New task popup for that date.
     const group = document.querySelector('#groups [data-date="' + key + '"]');
-    if (group) group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (group) {
+      group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      group.classList.remove('flash');
+      void group.offsetWidth; // restart the animation when the same day is clicked again
+      group.classList.add('flash');
+    } else {
+      openTaskDialog(key);
+    }
   }
 });
 

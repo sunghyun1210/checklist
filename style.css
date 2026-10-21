@@ -398,15 +398,11 @@ h2 {
 
 .cat-edit {
   position: absolute;
-  right: 10px;
+  right: 34px; /* leaves room for the x */
   display: none;
   padding: 2px;
   color: var(--muted);
   line-height: 0;
-}
-
-.side-item.has-remove .cat-edit {
-  right: 34px; /* leaves room for the x */
 }
 
 .cat-edit:hover {
@@ -439,12 +435,20 @@ h2 {
   color: var(--text);
 }
 
-/* x on a category that has no tasks, to remove it again */
+/* x on every category (on hover): deletes it. It sits over the task count, which hides while hovering.
+   Touch screens have no hover: they use the menu of a long press instead. */
 .remove-cat {
-  margin-left: auto;
+  position: absolute;
+  right: 10px;
   padding: 0 4px;
   color: #c3c7ca;
   line-height: 1;
+}
+
+@media (hover: none) {
+  .remove-cat {
+    display: none;
+  }
 }
 
 .remove-cat:hover {
@@ -579,6 +583,23 @@ h2 {
 #view-title {
   margin-bottom: 6px;
   font-size: 1.35rem;
+}
+
+/* A short green glow on the date group that was picked in the small calendar */
+.group.flash {
+  border-radius: var(--radius);
+  animation: group-flash 1.4s ease-out;
+}
+
+@keyframes group-flash {
+  0%,
+  100% {
+    background: transparent;
+  }
+  15%,
+  45% {
+    background: rgba(95, 143, 135, 0.18);
+  }
 }
 
 .group h3 {
