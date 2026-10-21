@@ -153,6 +153,35 @@ h2 {
   text-align: left;
 }
 
+.side-item.add {
+  color: var(--muted);
+}
+
+/* Name box that replaces the "+ Add category" button while typing */
+#new-category {
+  width: 100%;
+  margin: 2px 0;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 999px;
+  outline: 2px solid var(--accent);
+  outline-offset: -2px; /* inside the box, so the sidebar does not cut it off */
+  background: var(--card);
+  color: var(--text);
+}
+
+/* x on a category that has no tasks, to remove it again */
+.remove-cat {
+  margin-left: auto;
+  padding: 0 4px;
+  color: #c3c7ca;
+  line-height: 1;
+}
+
+.remove-cat:hover {
+  color: var(--late);
+}
+
 .side-item.active {
   background: var(--card);
   box-shadow: var(--shadow);
@@ -774,6 +803,11 @@ dialog::backdrop {
 
   .side-heading {
     display: none;
+  }
+
+  #new-category {
+    flex-shrink: 0;
+    width: 150px;
   }
 
   .side-item {

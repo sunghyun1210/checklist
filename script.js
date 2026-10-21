@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'checklist-v2'; // the old per-day/week/month data is not used any more
+const CATEGORY_KEY = 'checklist-v2-categories';
 const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 // Category colors: c = text and dot, s = soft background
@@ -18,6 +19,7 @@ const $ = (id) => document.getElementById(id);
 // Each item: { id, text, category, minutes, due, done, doneDate }
 // due and doneDate are 'YYYY-MM-DD' strings (doneDate is '' until the item is checked)
 let items = loadItems();
+let savedCategories = loadCategories(); // names made with "+ Add category"; they stay even without tasks
 let view = 'checklist'; // 'checklist' | 'calendar'
 let subList = 'all'; // checklist: 'all' shows finished items too, 'todo' hides them
 let calMode = 'month'; // calendar: 'month' | 'week'
@@ -39,6 +41,19 @@ function loadItems() {
 
 function saveItems() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function loadCategories() {
+  try {
+    const data = JSON.parse(localStorage.getItem(CATEGORY_KEY));
+    return Array.isArray(data) ? data.filter((n) => typeof n === 'string' && n) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveCategories() {
+  localStorage.setItem(CATEGORY_KEY, JSON.stringify(savedCategories));
 }
 
 // Every change to `items` goes through here: run it, remember the old version for undo, save, redraw
@@ -205,15 +220,15 @@ function dateToken(key) {
 
 // ---------- Categories and the sidebar filter ----------
 
-// Category names used by any item (@aie510 and @AIE510 count as the same one)
+// Saved categories first, then the ones that only exist because a task uses them.
+// (@aie510 and @AIE510 count as the same one)
 function categoryNames() {
   const names = [];
-  items.forEach((item) => {
-    const name = item.category;
-    if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) {
-      names.push(name);
-    }
-  });
+  const addName = (name) => {
+    if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) names.push(name);
+  };
+  savedCategories.forEach(addName);
+  items.forEach((item) => addName(item.category));
   return names;
 }
 
@@ -305,6 +320,15 @@ function renderSidebar() {
       el('span', '', name),
       el('span', 'side-count', left((it) => it.category.toLowerCase() === name.toLowerCase()) || '')
     );
+
+    // A saved category with no tasks at all can be removed again
+    const used = items.some((it) => it.category.toLowerCase() === name.toLowerCase());
+    if (!used) {
+      const remove = el('span', 'remove-cat', '×');
+      remove.dataset.name = name;
+      remove.setAttribute('aria-label', 'Remove category');
+      btn.append(remove);
+    }
     list.append(btn);
   });
 }
@@ -624,6 +648,8 @@ $('import-file').addEventListener('change', async (e) => {
 
 $('clear-all').addEventListener('click', () => {
   if (!confirm('Delete all tasks? This cannot be undone.')) return;
+  savedCategories = []; // not part of undo: Ctrl+Z brings the tasks back, not empty categories
+  saveCategories();
   change(() => {
     items = [];
   });
@@ -798,8 +824,51 @@ $('sub-tabs').addEventListener('click', (e) => {
   render();
 });
 
+// "+ Add category": the button turns into a name box (Enter or clicking away adds, Esc cancels)
+const newCategory = $('new-category');
+
+$('add-category').addEventListener('click', () => {
+  $('add-category').hidden = true;
+  newCategory.hidden = false;
+  newCategory.value = '';
+  newCategory.focus();
+});
+
+function finishNewCategory(save) {
+  if (newCategory.hidden) return; // already finished (hiding the box fires blur once more)
+  newCategory.hidden = true;
+  $('add-category').hidden = false;
+
+  // Names cannot contain spaces, because "@name" ends at the first space
+  const name = newCategory.value.trim().replace(/^@+/, '').replace(/\s+/g, '-');
+  if (!save || !name) return;
+
+  let existing = categoryNames().find((n) => n.toLowerCase() === name.toLowerCase());
+  if (!existing) {
+    savedCategories.push(name);
+    saveCategories();
+    existing = name;
+  }
+  filter = 'cat:' + existing.toLowerCase(); // jump to it, so the next task goes in there
+  render();
+}
+
+newCategory.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') finishNewCategory(true);
+  if (e.key === 'Escape') finishNewCategory(false);
+});
+newCategory.addEventListener('blur', () => finishNewCategory(true));
+
 // Click a category to filter; click it again (or Inbox) to see everything
 $('sidebar').addEventListener('click', (e) => {
+  const remove = e.target.closest('.remove-cat');
+  if (remove) {
+    savedCategories = savedCategories.filter((n) => n.toLowerCase() !== remove.dataset.name.toLowerCase());
+    saveCategories();
+    render();
+    return;
+  }
+
   const btn = e.target.closest('[data-filter]');
   if (!btn) return;
   filter = filter === btn.dataset.filter ? '' : btn.dataset.filter;
