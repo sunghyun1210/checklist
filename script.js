@@ -10,6 +10,8 @@ const form = document.getElementById('add-form');
 const input = document.getElementById('new-item');
 const list = document.getElementById('list');
 const periodLabel = document.getElementById('period-label');
+const footer = document.getElementById('footer');
+const count = document.getElementById('count');
 
 // ---------- Storage ----------
 
@@ -78,15 +80,44 @@ function render() {
     btn.classList.toggle('active', btn.dataset.scope === scope);
   });
 
-  const period = currentPeriod();
-  const visible = items.filter((item) => item.scope === scope && item.period === period);
+  const visible = visibleItems();
 
   list.innerHTML = '';
   visible.forEach((item) => {
     const li = document.createElement('li');
-    li.textContent = item.text; // textContent keeps user input safe from HTML injection
+    li.dataset.id = item.id;
+    li.classList.toggle('done', item.done);
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.checked = item.done;
+
+    const text = document.createElement('span');
+    text.className = 'text';
+    text.textContent = item.text; // textContent keeps user input safe from HTML injection
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'delete';
+    del.textContent = '×';
+    del.setAttribute('aria-label', 'Delete');
+
+    li.append(checkbox, text, del);
     list.appendChild(li);
   });
+
+  // Footer: remaining count + clear button (hidden when the list is empty)
+  const left = visible.filter((item) => !item.done).length;
+  count.textContent = left + (left === 1 ? ' item left' : ' items left');
+  footer.hidden = visible.length === 0;
+}
+
+// Items of the current day/week/month: unfinished first, finished at the bottom
+function visibleItems() {
+  const period = currentPeriod();
+  return items
+    .filter((item) => item.scope === scope && item.period === period)
+    .sort((a, b) => a.done - b.done); // sort is stable, so the original order is kept
 }
 
 // ---------- Events ----------
@@ -107,6 +138,31 @@ form.addEventListener('submit', (e) => {
 
   input.value = '';
   input.focus();
+  render();
+});
+
+// One listener on the whole list handles every checkbox and delete button
+list.addEventListener('click', (e) => {
+  const li = e.target.closest('li');
+  if (!li) return;
+  const item = items.find((it) => it.id === li.dataset.id);
+
+  if (e.target.matches('input[type="checkbox"]')) {
+    item.done = e.target.checked;
+  } else if (e.target.matches('.delete')) {
+    items = items.filter((it) => it !== item);
+  } else {
+    return;
+  }
+  saveItems();
+  render();
+});
+
+// Remove finished items from the current list only
+document.getElementById('clear-done').addEventListener('click', () => {
+  const shown = visibleItems();
+  items = items.filter((it) => !(shown.includes(it) && it.done));
+  saveItems();
   render();
 });
 

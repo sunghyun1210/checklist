@@ -20,7 +20,7 @@ body {
 }
 
 /* Narrow centered column: fine on phones, not too wide on desktop */
-main {
+body {
   max-width: 520px;
   margin: 0 auto;
   padding: 24px 16px;
@@ -116,4 +116,57 @@ button {
 #list li {
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
+}
+
+/* One row: checkbox, text, delete button */
+#list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#list input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.text {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* Completed items: faded and pushed to the bottom (sorting is in script.js) */
+li.done {
+  opacity: 0.45;
+}
+
+.delete {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+#footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#footer[hidden] {
+  display: none;
+}
+
+#clear-done {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+  font-size: 0.9rem;
 }
