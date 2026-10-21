@@ -7,38 +7,66 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main>
-    <h1>Checklist</h1>
-
-    <!-- Day / Week / Month: each has its own separate list -->
-    <nav id="scope-tabs">
-      <button type="button" data-scope="day">Day</button>
-      <button type="button" data-scope="week">Week</button>
-      <button type="button" data-scope="month">Month</button>
+  <!-- Main toolbar -->
+  <header id="topbar">
+    <nav id="main-tabs">
+      <button type="button" data-view="checklist">Checklist</button>
     </nav>
+    <button type="button" id="new-task">+ New task</button>
+  </header>
 
-    <div id="period-nav">
-      <button type="button" id="prev" aria-label="Previous">&lsaquo;</button>
-      <span id="period-label"></span>
-      <button type="button" id="next" aria-label="Next">&rsaquo;</button>
-      <button type="button" id="today">Today</button>
-    </div>
+  <div id="layout">
+    <!-- Left: Inbox and categories (filled by script.js) -->
+    <aside id="sidebar">
+      <button type="button" class="side-item" data-filter="inbox">
+        <span>Inbox</span><span id="inbox-count" class="side-count"></span>
+      </button>
+      <h2 class="side-heading">Categories</h2>
+      <div id="category-list"></div>
+    </aside>
 
-    <!-- Filled by script.js with All | category buttons -->
-    <div id="category-tabs" hidden></div>
+    <main id="content">
+      <section id="checklist-view">
+        <!-- Sub toolbar: All shows finished items too, To do hides them -->
+        <nav id="sub-tabs">
+          <button type="button" data-sub="all">All</button>
+          <button type="button" data-sub="todo">To do</button>
+        </nav>
 
+        <h2 id="view-title"></h2>
+        <div id="groups"></div>
+
+        <div id="footer" hidden>
+          <span id="count"></span>
+          <button type="button" id="clear-done">Clear completed</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- New task popup -->
+  <dialog id="task-dialog">
     <form id="add-form">
       <input id="new-item" type="text" placeholder='Add a new item (e.g. @Category "task" t30)' autocomplete="off">
-      <button type="submit">Add</button>
+      <div class="chips">
+        <input id="chip-date" type="date" aria-label="Due date">
+        <select id="chip-category" aria-label="Category"></select>
+        <select id="chip-minutes" aria-label="Estimate">
+          <option value="0">Estimate</option>
+          <option value="5">5m</option>
+          <option value="10">10m</option>
+          <option value="15">15m</option>
+          <option value="25">25m</option>
+          <option value="30">30m</option>
+          <option value="45">45m</option>
+          <option value="60">1h</option>
+          <option value="90">1h 30m</option>
+          <option value="120">2h</option>
+        </select>
+        <button type="submit">Add</button>
+      </div>
     </form>
-
-    <ul id="list"></ul>
-
-    <div id="footer" hidden>
-      <span id="count"></span>
-      <button type="button" id="clear-done">Clear completed</button>
-    </div>
-  </main>
+  </dialog>
 
   <script src="script.js"></script>
 </body>

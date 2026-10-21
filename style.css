@@ -5,10 +5,16 @@
   --muted: #999;
   --accent: #6b8f8a;
   --line: #ddd8cc;
+  --late: #b5654f;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Without this, display: flex/grid below would win over the hidden attribute */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -19,20 +25,9 @@ body {
   line-height: 1.5;
 }
 
-/* Narrow centered column: fine on phones, not too wide on desktop */
-main {
-  max-width: 520px;
-  margin: 0 auto;
-  padding: 24px 16px;
-}
-
-h1 {
-  font-size: 1.5rem;
-  margin: 0 0 16px;
-}
-
 /* 16px font stops iOS from zooming into inputs */
 input,
+select,
 button {
   font: inherit;
   font-size: 16px;
@@ -42,20 +37,41 @@ button {
   cursor: pointer;
 }
 
-#add-form {
+h2 {
+  margin: 0;
+}
+
+/* ---------- Top toolbar ---------- */
+
+#topbar {
   display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px 16px 0;
 }
 
-#new-item {
-  flex: 1;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
+#main-tabs {
+  display: flex;
+  gap: 4px;
 }
 
+#main-tabs button {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+#main-tabs button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+#new-task,
 #add-form button {
   padding: 8px 16px;
   border: none;
@@ -64,68 +80,117 @@ button {
   color: #fff;
 }
 
-#list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* ---------- Page layout: sidebar | content ---------- */
+
+#layout {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
 }
 
-/* Day / Week / Month tabs and previous/next bar */
-#scope-tabs {
+#sidebar {
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.side-heading {
+  margin: 16px 10px 4px;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+#category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.side-item {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.side-item.active {
+  background: rgba(107, 143, 138, 0.2);
+}
+
+.side-count {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* ---------- Checklist view ---------- */
+
+#sub-tabs {
   display: flex;
   gap: 4px;
   margin-bottom: 12px;
 }
 
-#scope-tabs button {
-  flex: 1;
-  padding: 6px;
+#sub-tabs button {
+  padding: 4px 14px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 999px;
   background: transparent;
   color: var(--text);
 }
 
-#scope-tabs button.active {
+#sub-tabs button.active {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
 }
 
-#period-nav {
+#view-title {
+  margin-bottom: 12px;
+  font-size: 1.4rem;
+}
+
+/* One group per date: Overdue, Today, ... */
+.group {
+  margin-bottom: 20px;
+}
+
+.group h3 {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.group h3.overdue {
+  color: var(--late);
+}
+
+.group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* One row: handle, checkbox, text, labels, delete button */
+.group li {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-#period-nav button {
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-}
-
-#period-label {
-  flex: 1;
-  text-align: center;
-  font-weight: 600;
-}
-
-#list li {
+  gap: 10px;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
 
-/* One row: checkbox, text, delete button */
-#list li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-#list input[type="checkbox"] {
+.group input[type="checkbox"] {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
@@ -134,9 +199,25 @@ button {
 .text {
   flex: 1;
   word-break: break-word;
+  touch-action: manipulation; /* stops double-tap zoom, so double-tap can edit */
 }
 
-/* Completed items: faded and pushed to the bottom (sorting is in script.js) */
+.tag {
+  color: var(--accent);
+  font-size: 0.8rem;
+}
+
+.time,
+.date {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.date.late {
+  color: var(--late);
+}
+
+/* Completed items: faded and pushed to the bottom of their date group */
 li.done {
   opacity: 0.45;
 }
@@ -150,78 +231,6 @@ li.done {
   padding: 4px 8px;
 }
 
-#footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-#footer[hidden] {
-  display: none;
-}
-
-#clear-done {
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  text-decoration: underline;
-  font-size: 0.9rem;
-}
-
-/* Category tabs (All | AIE510 | ...) and the small category label on items */
-#category-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 12px;
-}
-
-#category-tabs[hidden] {
-  display: none;
-}
-
-#category-tabs button {
-  padding: 2px 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text);
-  font-size: 0.9rem;
-}
-
-#category-tabs button.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.tag {
-  color: var(--accent);
-  font-size: 0.8rem;
-}
-
-.time {
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-/* Editing an item in place */
-.edit {
-  flex: 1;
-  min-width: 0;
-  padding: 2px 6px;
-  border: 1px solid var(--accent);
-  border-radius: 4px;
-}
-
-/* Stops double-tap from zooming the page on phones, so double-tap can edit */
-.text {
-  touch-action: manipulation;
-}
-
 /* Drag handle: touch-action none lets a finger drag it without scrolling the page */
 .handle {
   color: var(--muted);
@@ -233,4 +242,126 @@ li.done {
 
 li.dragging {
   background: rgba(0, 0, 0, 0.04);
+}
+
+/* Editing an item in place */
+.edit {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+#footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+#clear-done {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
+
+/* ---------- New task popup ---------- */
+
+dialog {
+  width: min(560px, calc(100vw - 32px));
+  margin: 12vh auto auto;
+  padding: 0; /* so a click on the dialog itself means a click on the backdrop */
+  border: none;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+#add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+#new-item {
+  width: 100%;
+  padding: 6px 2px;
+  border: none;
+  outline: none;
+  font-size: 1.05rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.chips input,
+.chips select {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+}
+
+.chips button {
+  margin-left: auto;
+}
+
+/* ---------- Phone ---------- */
+
+@media (max-width: 720px) {
+  #layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  /* Sidebar turns into a row of pills that scrolls sideways */
+  #sidebar,
+  #category-list {
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  #sidebar {
+    overflow-x: auto;
+  }
+
+  .side-heading {
+    display: none;
+  }
+
+  .side-item {
+    width: auto;
+    gap: 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  /* Round New task button in the bottom right corner */
+  #new-task {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 10;
+    padding: 12px 20px;
+    border-radius: 999px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+  }
 }
