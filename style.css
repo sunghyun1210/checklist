@@ -20,7 +20,7 @@ body {
 }
 
 /* Narrow centered column: fine on phones, not too wide on desktop */
-body {
+main {
   max-width: 520px;
   margin: 0 auto;
   padding: 24px 16px;

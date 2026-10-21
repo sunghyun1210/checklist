@@ -7,35 +7,38 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Checklist</h1>
+  <main>
+    <h1>Checklist</h1>
 
-  <!-- Day / Week / Month: each has its own separate list -->
-  <nav id="scope-tabs">
-    <button type="button" data-scope="day">Day</button>
-    <button type="button" data-scope="week">Week</button>
-    <button type="button" data-scope="month">Month</button>
-  </nav>
+    <!-- Day / Week / Month: each has its own separate list -->
+    <nav id="scope-tabs">
+      <button type="button" data-scope="day">Day</button>
+      <button type="button" data-scope="week">Week</button>
+      <button type="button" data-scope="month">Month</button>
+    </nav>
 
-  <div id="period-nav">
-    <button type="button" id="prev" aria-label="Previous">&lsaquo;</button>
-    <span id="period-label"></span>
-    <button type="button" id="next" aria-label="Next">&rsaquo;</button>
-    <button type="button" id="today">Today</button>
-  </div>
+    <div id="period-nav">
+      <button type="button" id="prev" aria-label="Previous">&lsaquo;</button>
+      <span id="period-label"></span>
+      <button type="button" id="next" aria-label="Next">&rsaquo;</button>
+      <button type="button" id="today">Today</button>
+    </div>
 
-  <div id="category-tabs" hidden></div>
+    <!-- Filled by script.js with All | category buttons -->
+    <div id="category-tabs" hidden></div>
 
-  <form id="add-form">
-    <input id="new-item" placeholder="Add task" required>
-    <button>Add</button>
-  </form>
+    <form id="add-form">
+      <input id="new-item" type="text" placeholder='Add a new item (e.g. @Category "task" t30)' autocomplete="off">
+      <button type="submit">Add</button>
+    </form>
 
-  <ul id="list"></ul>
+    <ul id="list"></ul>
 
-  <div id="footer" hidden>
-    <span id="count"></span>
-    <button type="button" id="clear-done">Clear completed</button>
-  </div>
+    <div id="footer" hidden>
+      <span id="count"></span>
+      <button type="button" id="clear-done">Clear completed</button>
+    </div>
+  </main>
 
   <script src="script.js"></script>
 </body>
