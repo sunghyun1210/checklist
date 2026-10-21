@@ -694,7 +694,7 @@ function openTaskDialog(date) {
   $('chip-minutes').value = '0';
   input.value = '';
   showPreview();
-  hideSuggest();
+  popupSuggest.hide();
   dialog.showModal();
   input.focus();
 }
@@ -714,108 +714,123 @@ function showPreview() {
   if (parsed.due) box.append(el('span', 'pill', dateLabel(parsed.due)));
 }
 
-// ---------- @category suggestions in the popup ----------
+// ---------- @category suggestions (New task popup and the double-click edit box) ----------
 // Typing "@" lists every category; "@A" only the ones that start with A.
+// Up/Down move the highlight, Enter or Tab fill it in, Esc closes the list.
+//   field    the text box
+//   box      the <ul> that shows the list
+//   onShow   called after the list was filled (the edit box uses it to place the list)
+//   onPick   called after a category was filled in
+function setupCategorySuggest(field, box, { onShow, onPick } = {}) {
+  let suggestions = []; // the names in the list right now
+  let index = 0; // which one is highlighted
 
-const suggestBox = $('suggest');
-let suggestions = []; // the names in the list right now
-let suggestIndex = 0; // which one is highlighted
+  // The "@word" being typed at the cursor, or null. Only the first @word of a task counts as its
+  // category, so there is nothing to suggest after another one.
+  function token() {
+    const caret = field.selectionStart;
+    const before = field.value.slice(0, caret);
+    const m = /(^|\s)@(\S*)$/.exec(before);
+    if (!m) return null;
 
-// The "@word" being typed at the cursor, or null. Only the first @word of a task counts as its
-// category, so there is nothing to suggest after another one.
-function categoryToken() {
-  const caret = input.selectionStart;
-  const before = input.value.slice(0, caret);
-  const m = /(^|\s)@(\S*)$/.exec(before);
-  if (!m) return null;
+    const start = m.index + m[1].length; // position of the @
+    if (/(^|\s)@\S/.test(before.slice(0, start))) return null;
 
-  const start = m.index + m[1].length; // position of the @
-  if (/(^|\s)@\S/.test(before.slice(0, start))) return null;
-
-  const rest = /^\S*/.exec(input.value.slice(caret))[0]; // the rest of the word, if the cursor is inside it
-  return { start: start, end: caret + rest.length, typed: m[2] };
-}
-
-function hideSuggest() {
-  suggestBox.hidden = true;
-  suggestions = [];
-}
-
-function updateSuggest() {
-  const token = categoryToken();
-  if (!token) return hideSuggest();
-
-  const typed = token.typed.toLowerCase();
-  suggestions = categoryNames().filter((name) => name.toLowerCase().startsWith(typed));
-
-  // Nothing matches, or it is already typed out completely: no list (Enter then adds the task)
-  if (!suggestions.length || (suggestions.length === 1 && suggestions[0].toLowerCase() === typed)) {
-    return hideSuggest();
+    const rest = /^\S*/.exec(field.value.slice(caret))[0]; // the rest of the word, if the cursor is inside it
+    return { start: start, end: caret + rest.length, typed: m[2] };
   }
 
-  suggestIndex = 0;
-  drawSuggest();
-  suggestBox.hidden = false;
-}
+  function hide() {
+    box.hidden = true;
+    suggestions = [];
+  }
 
-function drawSuggest() {
-  suggestBox.innerHTML = '';
-  suggestions.forEach((name, i) => {
-    const li = el('li', i === suggestIndex ? 'active' : '');
-    li.setAttribute('role', 'option');
-    li.dataset.name = name;
-    colorize(li, name);
-    li.append(el('span', 'dot'), el('span', '', name));
-    suggestBox.append(li);
+  function draw() {
+    box.innerHTML = '';
+    suggestions.forEach((name, i) => {
+      const li = el('li', i === index ? 'active' : '');
+      li.setAttribute('role', 'option');
+      li.dataset.name = name;
+      colorize(li, name);
+      li.append(el('span', 'dot'), el('span', '', name));
+      box.append(li);
+    });
+  }
+
+  function update() {
+    const found = token();
+    if (!found) return hide();
+
+    const typed = found.typed.toLowerCase();
+    suggestions = categoryNames().filter((name) => name.toLowerCase().startsWith(typed));
+
+    // Nothing matches, or it is already typed out completely: no list (Enter then adds the task)
+    if (!suggestions.length || (suggestions.length === 1 && suggestions[0].toLowerCase() === typed)) {
+      return hide();
+    }
+
+    index = 0;
+    draw();
+    box.hidden = false;
+    if (onShow) onShow();
+  }
+
+  // Replace the @word with the chosen category and a space, so typing can go on
+  function pick(name) {
+    const found = token();
+    if (!found) return;
+    const tail = field.value.slice(found.end).replace(/^\s+/, '');
+    field.value = field.value.slice(0, found.start) + '@' + name + ' ' + tail;
+    const cursor = found.start + name.length + 2;
+    field.setSelectionRange(cursor, cursor);
+    field.focus();
+    hide();
+    if (onPick) onPick();
+  }
+
+  field.addEventListener('input', update);
+  field.addEventListener('click', update); // the cursor moved
+  field.addEventListener('keyup', (e) => {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) update();
   });
+
+  // Capture phase + stopImmediatePropagation: while the list is open these keys belong to the list,
+  // so the other key handlers of the box (Enter = save, Esc = cancel) must not see them.
+  field.addEventListener(
+    'keydown',
+    (e) => {
+      if (box.hidden || e.isComposing) return;
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const step = e.key === 'ArrowDown' ? 1 : -1;
+        index = (index + step + suggestions.length) % suggestions.length;
+        draw();
+        box.children[index].scrollIntoView({ block: 'nearest' });
+      } else if (e.key === 'Enter' || e.key === 'Tab') {
+        pick(suggestions[index]); // Enter picks the category instead of adding the task
+      } else if (e.key === 'Escape') {
+        hide(); // closes the list, not the popup
+      } else {
+        return;
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    },
+    true
+  );
+
+  // A click on a name must not take the focus away from the text box
+  box.addEventListener('mousedown', (e) => e.preventDefault());
+  box.addEventListener('click', (e) => {
+    const item = e.target.closest('li');
+    if (item) pick(item.dataset.name);
+  });
+
+  return { hide: hide };
 }
 
-// Replace the @word with the chosen category and a space, so typing can go on
-function pickSuggestion(name) {
-  const token = categoryToken();
-  if (!token) return;
-  const tail = input.value.slice(token.end).replace(/^\s+/, '');
-  input.value = input.value.slice(0, token.start) + '@' + name + ' ' + tail;
-  const cursor = token.start + name.length + 2;
-  input.setSelectionRange(cursor, cursor);
-  input.focus();
-  hideSuggest();
-  showPreview();
-}
-
-input.addEventListener('input', () => {
-  showPreview();
-  updateSuggest();
-});
-input.addEventListener('click', updateSuggest); // the cursor moved
-input.addEventListener('keyup', (e) => {
-  if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) updateSuggest();
-});
-
-input.addEventListener('keydown', (e) => {
-  if (suggestBox.hidden || e.isComposing) return;
-
-  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-    e.preventDefault();
-    const step = e.key === 'ArrowDown' ? 1 : -1;
-    suggestIndex = (suggestIndex + step + suggestions.length) % suggestions.length;
-    drawSuggest();
-    suggestBox.children[suggestIndex].scrollIntoView({ block: 'nearest' });
-  } else if (e.key === 'Enter' || e.key === 'Tab') {
-    e.preventDefault(); // Enter picks the category instead of adding the task
-    pickSuggestion(suggestions[suggestIndex]);
-  } else if (e.key === 'Escape') {
-    e.preventDefault(); // closes the list, not the popup
-    hideSuggest();
-  }
-});
-
-// A click on a name must not take the focus away from the text box
-suggestBox.addEventListener('mousedown', (e) => e.preventDefault());
-suggestBox.addEventListener('click', (e) => {
-  const item = e.target.closest('li');
-  if (item) pickSuggestion(item.dataset.name);
-});
+const popupSuggest = setupCategorySuggest(input, $('suggest'), { onPick: showPreview });
+input.addEventListener('input', showPreview);
 
 $('new-task').addEventListener('click', () => openTaskDialog());
 
@@ -960,10 +975,25 @@ groupsBox.addEventListener('dblclick', (e) => {
   edit.focus();
   edit.select();
 
+  // The same @category list as in the popup, floating right under the edit box
+  const list = el('ul', 'suggest floating');
+  list.setAttribute('role', 'listbox');
+  list.hidden = true;
+  document.body.append(list);
+  setupCategorySuggest(edit, list, {
+    onShow() {
+      const box = edit.getBoundingClientRect();
+      list.style.left = box.left + 'px';
+      list.style.top = box.bottom + 4 + 'px';
+      list.style.width = Math.max(box.width, 180) + 'px';
+    },
+  });
+
   let finished = false; // render() removes the input, which fires blur again
   function finish(save) {
     if (finished) return;
     finished = true;
+    list.remove();
     const parsed = parseInput(edit.value);
     if (save && parsed.text) { // empty text: keep the old item
       change(() => {

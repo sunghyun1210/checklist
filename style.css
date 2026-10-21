@@ -1026,7 +1026,7 @@ dialog::backdrop {
 }
 
 /* Category suggestions while typing an @ */
-#suggest {
+.suggest {
   list-style: none;
   max-height: 176px;
   margin: 0;
@@ -1036,7 +1036,7 @@ dialog::backdrop {
   background: var(--soft);
 }
 
-#suggest li {
+.suggest li {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1045,9 +1045,22 @@ dialog::backdrop {
   cursor: pointer;
 }
 
-#suggest li.active {
+.suggest li.active {
   background: var(--card);
   box-shadow: var(--shadow);
+}
+
+/* The same list floating under the edit box of a task (positioned by script.js) */
+.suggest.floating {
+  position: fixed;
+  z-index: 60;
+  background: var(--card);
+  box-shadow: 0 10px 28px rgba(30, 40, 40, 0.2);
+}
+
+.suggest.floating li.active {
+  background: var(--soft);
+  box-shadow: none;
 }
 
 /* What the text box understood (category, time, date) */
