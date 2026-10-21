@@ -270,6 +270,16 @@ function colorize(node, name) {
   node.style.setProperty('--s', color.s);
 }
 
+// Finished tasks older than this many days are hidden from the lists (not deleted)
+const HIDE_DONE_AFTER_DAYS = 7;
+
+// Finished more than HIDE_DONE_AFTER_DAYS days ago? (tasks with no finish date use their due date)
+function isOldDone(item) {
+  if (!item.done) return false;
+  const limit = dateKey(addDays(fromKey(todayKey()), -HIDE_DONE_AFTER_DAYS));
+  return (item.doneDate || item.due) < limit;
+}
+
 const SMART_TITLES = {
   today: 'Today',
   next: 'Next 7 days',
@@ -483,7 +493,16 @@ function renderChecklist() {
   $('view-title').textContent = query ? title + ' · “' + query + '”' : title;
 
   const completedList = filter === 'smart:completed'; // always shows finished items
-  const shown = filteredItems().filter((it) => subList === 'all' || completedList || !it.done);
+  let shown = filteredItems().filter((it) => subList === 'all' || completedList || !it.done);
+
+  // Tasks finished a while ago are hidden here (they stay in Completed and in the calendar)
+  let hiddenOld = 0;
+  if (!completedList) {
+    const recent = shown.filter((it) => !isOldDone(it));
+    hiddenOld = shown.length - recent.length;
+    shown = recent;
+  }
+
   const today = todayKey();
   const groups = [];
 
@@ -530,8 +549,9 @@ function renderChecklist() {
   const minutesLeft = remaining.reduce((sum, it) => sum + it.minutes, 0);
   let text = remaining.length + (remaining.length === 1 ? ' item left' : ' items left');
   if (minutesLeft) text += ' · ' + formatMinutes(minutesLeft);
+  if (hiddenOld) text += ' · ' + hiddenOld + ' older finished hidden (see Completed)';
   $('count').textContent = text;
-  $('footer').hidden = shown.length === 0;
+  $('footer').hidden = shown.length === 0 && hiddenOld === 0;
   $('clear-done').hidden = !shown.some((it) => it.done); // nothing finished is shown: nothing to clear
 }
 
@@ -995,10 +1015,12 @@ function applyOrder(ids) {
   });
 }
 
-// Remove finished items that match the sidebar filter
+// Remove the finished tasks that are on screen. The old ones hidden from the list stay
+// (nobody should lose tasks they cannot see); the Completed list shows and clears all of them.
 $('clear-done').addEventListener('click', () => {
+  const everything = filter === 'smart:completed';
   change(() => {
-    items = items.filter((it) => !(it.done && isVisible(it)));
+    items = items.filter((it) => !(it.done && isVisible(it) && (everything || !isOldDone(it))));
   });
 });
 
