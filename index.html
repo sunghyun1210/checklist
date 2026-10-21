@@ -168,11 +168,25 @@
     <div class="dialog-body">
       <h2>Settings</h2>
       <p class="hint">Your tasks are saved only in this browser. Export a backup once in a while.</p>
+      <p class="hint">Tip: on a phone, press and hold a category to rename it or move it.</p>
       <button type="button" id="export">Export backup</button>
       <button type="button" id="import">Import backup</button>
       <input type="file" id="import-file" accept="application/json" hidden>
       <button type="button" id="clear-all" class="danger">Clear all data</button>
       <button type="button" id="close-settings">Close</button>
+    </div>
+  </dialog>
+
+  <!-- Category menu: press and hold a category on a phone -->
+  <dialog id="category-dialog">
+    <div class="dialog-body">
+      <h2 id="category-dialog-title"></h2>
+      <button type="button" id="cat-rename">Rename</button>
+      <div class="button-row">
+        <button type="button" id="cat-earlier">&larr; Move earlier</button>
+        <button type="button" id="cat-later">Move later &rarr;</button>
+      </div>
+      <button type="button" id="cat-close">Close</button>
     </div>
   </dialog>
 

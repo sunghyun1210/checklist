@@ -1082,6 +1082,29 @@ dialog::backdrop {
   color: var(--late);
 }
 
+.dialog-body button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.button-row button {
+  flex: 1;
+}
+
+/* On a touch screen a long press must not select the text or open the browser's own menu */
+@media (pointer: coarse) {
+  #category-list .side-item {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
 /* ---------- Phone ---------- */
 
 @media (max-width: 720px) {

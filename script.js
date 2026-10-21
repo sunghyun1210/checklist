@@ -1185,6 +1185,79 @@ $('category-list').addEventListener('dblclick', (e) => {
   if (row) startRename(row);
 });
 
+// Phone: press and hold a category (half a second) for a menu to rename it or move it.
+// (On a computer the pencil, double-click and dragging do the same.)
+const categoryDialog = $('category-dialog');
+let menuCategory = ''; // the category the menu is about
+
+function updateCategoryMenu() {
+  const names = categoryNames();
+  const i = names.findIndex((n) => n.toLowerCase() === menuCategory.toLowerCase());
+  $('cat-earlier').disabled = i <= 0;
+  $('cat-later').disabled = i === -1 || i >= names.length - 1;
+}
+
+function openCategoryMenu(name) {
+  menuCategory = name;
+  $('category-dialog-title').textContent = name;
+  updateCategoryMenu();
+  categoryDialog.showModal();
+}
+
+// Swap the category with its neighbor (dir = -1 earlier, +1 later); the menu stays open for more moves
+function moveMenuCategory(dir) {
+  const names = categoryNames();
+  const i = names.findIndex((n) => n.toLowerCase() === menuCategory.toLowerCase());
+  const j = i + dir;
+  if (i === -1 || j < 0 || j >= names.length) return;
+  [names[i], names[j]] = [names[j], names[i]];
+  change(() => {
+    savedCategories = names; // every category is saved with its place now
+  });
+  updateCategoryMenu();
+}
+
+$('cat-earlier').addEventListener('click', () => moveMenuCategory(-1));
+$('cat-later').addEventListener('click', () => moveMenuCategory(1));
+$('cat-close').addEventListener('click', () => categoryDialog.close());
+$('cat-rename').addEventListener('click', () => {
+  categoryDialog.close();
+  const row = [...document.querySelectorAll('#category-list .side-item')].find((b) => b.dataset.name === menuCategory);
+  if (row) startRename(row);
+});
+
+$('category-list').addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;
+  const row = e.target.closest('.side-item');
+  if (!row) return;
+
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const timer = setTimeout(() => {
+    stop();
+    openCategoryMenu(row.dataset.name);
+  }, 500);
+
+  // Moving the finger (scrolling the row of categories) or lifting it cancels the long press
+  function check(ev) {
+    if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 10) stop();
+  }
+  function stop() {
+    clearTimeout(timer);
+    document.removeEventListener('pointermove', check);
+    document.removeEventListener('pointerup', stop);
+    document.removeEventListener('pointercancel', stop);
+  }
+  document.addEventListener('pointermove', check);
+  document.addEventListener('pointerup', stop);
+  document.addEventListener('pointercancel', stop);
+});
+
+// Some phones open their own menu on a long press: not on the categories
+$('category-list').addEventListener('contextmenu', (e) => {
+  if (window.matchMedia('(pointer: coarse)').matches) e.preventDefault();
+});
+
 // Categories: reorder them in the sidebar (the order is saved)
 enableDrag($('category-list'), '.side-item', {
   moving: '.side-item',
