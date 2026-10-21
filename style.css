@@ -54,6 +54,18 @@ button {
   cursor: pointer;
 }
 
+/* Keyboard focus: a soft green ring drawn inside the shape. The browser's own ring is thick, black
+   and sits outside, so it looked like it was overlapping the neighbors. */
+:is(button, select, input[type="date"]):focus-visible {
+  outline: 2px solid rgba(95, 143, 135, 0.6);
+  outline-offset: -2px;
+}
+
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid rgba(95, 143, 135, 0.6);
+  outline-offset: 2px;
+}
+
 /* One weight for all headings and bold numbers, so everything looks the same */
 h2,
 b {
