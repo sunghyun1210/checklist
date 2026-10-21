@@ -363,8 +363,64 @@ h2 {
   }
 }
 
-/* Name box that replaces the "+ Add category" button while typing */
-#new-category {
+/* Category rows: a drag handle on the left and a pencil on the right, both only while hovering */
+#category-list .side-item {
+  position: relative;
+}
+
+.cat-handle {
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  width: 10px;
+  transform: translateY(-50%);
+  color: #c3c7ca;
+  font-size: 0.8rem;
+  line-height: 1;
+  text-align: center;
+  cursor: grab;
+  opacity: 0;
+  touch-action: none;
+  user-select: none;
+}
+
+.cat-edit {
+  position: absolute;
+  right: 10px;
+  display: none;
+  padding: 2px;
+  color: var(--muted);
+  line-height: 0;
+}
+
+.side-item.has-remove .cat-edit {
+  right: 34px; /* leaves room for the x */
+}
+
+.cat-edit:hover {
+  color: var(--accent);
+}
+
+#category-list .side-item:hover .cat-handle {
+  opacity: 1;
+}
+
+#category-list .side-item:hover .cat-edit {
+  display: block;
+}
+
+#category-list .side-item:hover .side-count {
+  visibility: hidden; /* the pencil takes its place */
+}
+
+.side-item.dragging {
+  background: var(--card);
+  box-shadow: 0 8px 24px rgba(30, 40, 40, 0.18);
+}
+
+/* Name box that replaces the "+ Add category" button while typing (also used to rename) */
+#new-category,
+.rename-input {
   width: 100%;
   margin: 2px 0;
   padding: 7px 14px;
@@ -1037,9 +1093,16 @@ dialog::backdrop {
     display: none;
   }
 
-  #new-category {
+  #new-category,
+  .rename-input {
     flex-shrink: 0;
     width: 150px;
+  }
+
+  /* Reordering needs a mouse: no handle and pencil on the phone (double-tap still renames) */
+  .cat-handle,
+  .cat-edit {
+    display: none !important;
   }
 
   /* Search, smart lists and categories all sit in the same sideways row */

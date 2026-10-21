@@ -61,25 +61,35 @@ function saveCategories() {
   localStorage.setItem(CATEGORY_KEY, JSON.stringify(savedCategories));
 }
 
-// Every change to `items` goes through here: run it, remember the old version for undo, save, redraw
+// Everything undo has to bring back: the tasks and the list of saved categories
+function snapshot() {
+  return JSON.stringify({ items: items, categories: savedCategories });
+}
+
+// Every change to the tasks or categories goes through here:
+// run it, remember the old version for undo, save, redraw
 function change(fn) {
-  const before = JSON.stringify(items);
+  const before = snapshot();
   fn();
-  if (JSON.stringify(items) !== before) {
+  if (snapshot() !== before) {
     undoStack.push(before);
     if (undoStack.length > 50) undoStack.shift();
     redoStack = []; // a new change ends the redo history
   }
   saveItems();
+  saveCategories();
   render();
 }
 
 // Move one step from one stack to the other (undo: undoStack -> redoStack, redo: the opposite)
 function restore(from, to) {
   if (!from.length) return;
-  to.push(JSON.stringify(items));
-  items = JSON.parse(from.pop()).map(cleanItem);
+  to.push(snapshot());
+  const data = JSON.parse(from.pop());
+  items = data.items.map(cleanItem);
+  savedCategories = data.categories;
   saveItems();
+  saveCategories();
   render();
 }
 
@@ -366,13 +376,27 @@ function renderSidebar() {
     const btn = el('button', 'side-item');
     btn.type = 'button';
     btn.dataset.filter = key;
+    btn.dataset.name = name;
     btn.classList.toggle('active', filter === key);
     colorize(btn, name);
+
+    const handle = el('span', 'cat-handle', '≡'); // drag to reorder
+    handle.setAttribute('aria-label', 'Drag to reorder');
     btn.append(
+      handle,
       el('span', 'dot'),
       el('span', '', name),
       el('span', 'side-count', left((it) => it.category.toLowerCase() === name.toLowerCase()) || '')
     );
+
+    // Pencil (shows on hover): rename
+    const edit = el('span', 'cat-edit');
+    edit.setAttribute('aria-label', 'Rename category');
+    edit.innerHTML =
+      '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" ' +
+      'stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/>' +
+      '<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+    btn.append(edit);
 
     // A saved category with no tasks at all can be removed again
     const used = items.some((it) => it.category.toLowerCase() === name.toLowerCase());
@@ -381,6 +405,7 @@ function renderSidebar() {
       remove.dataset.name = name;
       remove.setAttribute('aria-label', 'Remove category');
       btn.append(remove);
+      btn.classList.add('has-remove');
     }
     list.append(btn);
   });
@@ -749,10 +774,9 @@ $('import-file').addEventListener('change', async (e) => {
 
 $('clear-all').addEventListener('click', () => {
   if (!confirm('Delete all tasks? This cannot be undone.')) return;
-  savedCategories = []; // not part of undo: Ctrl+Z brings the tasks back, not empty categories
-  saveCategories();
   change(() => {
     items = [];
+    savedCategories = [];
   });
   settings.close();
 });
@@ -940,19 +964,106 @@ function finishNewCategory(save) {
   newCategory.hidden = true;
   $('add-category').hidden = false;
 
-  // Names cannot contain spaces, because "@name" ends at the first space
-  const name = newCategory.value.trim().replace(/^@+/, '').replace(/\s+/g, '-');
+  const name = cleanCategoryName(newCategory.value);
   if (!save || !name) return;
 
-  let existing = categoryNames().find((n) => n.toLowerCase() === name.toLowerCase());
-  if (!existing) {
-    savedCategories.push(name);
-    saveCategories();
-    existing = name;
-  }
+  const existing = categoryNames().find((n) => n.toLowerCase() === name.toLowerCase()) || name;
   filter = 'cat:' + existing.toLowerCase(); // jump to it, so the next task goes in there
-  render();
+  change(() => {
+    if (existing === name) savedCategories.push(name); // a brand new one
+  });
 }
+
+// Names cannot contain spaces, because "@name" ends at the first space
+function cleanCategoryName(raw) {
+  return raw.trim().replace(/^@+/, '').replace(/\s+/g, '-');
+}
+
+// Rename: the input replaces the category row. Enter or clicking away saves, Esc cancels.
+function startRename(row) {
+  const oldName = row.dataset.name;
+  const box = document.createElement('input');
+  box.type = 'text';
+  box.className = 'rename-input';
+  box.value = oldName;
+  box.maxLength = 30;
+  box.setAttribute('aria-label', 'Category name');
+  row.replaceWith(box);
+  box.focus();
+  box.select();
+
+  let finished = false; // render() removes the box, which fires blur again
+  function finish(save) {
+    if (finished) return;
+    finished = true;
+
+    const name = cleanCategoryName(box.value);
+    const clash = categoryNames().find(
+      (n) => n.toLowerCase() === name.toLowerCase() && n.toLowerCase() !== oldName.toLowerCase()
+    );
+
+    if (!save || !name || name === oldName) {
+      render(); // nothing to change: put the row back
+    } else if (clash) {
+      alert('There is already a category called "' + clash + '".');
+      render();
+    } else {
+      // Tasks keep their category, so they get the new name too
+      if (filter === 'cat:' + oldName.toLowerCase()) filter = 'cat:' + name.toLowerCase();
+      change(() => {
+        savedCategories = savedCategories.map((n) => (n.toLowerCase() === oldName.toLowerCase() ? name : n));
+        items.forEach((it) => {
+          if (it.category.toLowerCase() === oldName.toLowerCase()) it.category = name;
+        });
+      });
+    }
+  }
+
+  box.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') finish(true);
+    if (e.key === 'Escape') finish(false);
+  });
+  box.addEventListener('blur', () => finish(true));
+}
+
+// Double-click a category to rename it (the pencil that shows on hover does the same)
+$('category-list').addEventListener('dblclick', (e) => {
+  const row = e.target.closest('.side-item');
+  if (row) startRename(row);
+});
+
+// Drag the handle on the left of a category to change the order (the order is saved)
+$('category-list').addEventListener('pointerdown', (e) => {
+  if (!e.target.matches('.cat-handle')) return;
+  const row = e.target.closest('.side-item');
+  const list = $('category-list');
+  e.preventDefault();
+  row.classList.add('dragging');
+
+  // Same idea as dragging tasks: listeners on document, because moving the row cancels pointer capture
+  function move(ev) {
+    const over = document.elementFromPoint(ev.clientX, ev.clientY);
+    const target = over && over.closest('#category-list .side-item');
+    if (!target || target === row) return;
+    const box = target.getBoundingClientRect();
+    const below = ev.clientY > box.top + box.height / 2;
+    list.insertBefore(row, below ? target.nextSibling : target);
+  }
+
+  function end() {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
+    const order = [...list.children].map((btn) => btn.dataset.name);
+    change(() => {
+      savedCategories = order; // every category is saved with its place now
+    });
+  }
+
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
+});
 
 newCategory.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') finishNewCategory(true);
@@ -960,7 +1071,7 @@ newCategory.addEventListener('keydown', (e) => {
 });
 newCategory.addEventListener('blur', () => finishNewCategory(true));
 
-// Click a category to filter; click it again (or Inbox) to see everything
+// Click a category or smart list to filter; click All tasks to see everything again
 // Fold / unfold a sidebar group (Inbox, Categories) and remember it
 function loadFolded() {
   try {
@@ -1000,15 +1111,23 @@ $('sidebar').addEventListener('click', (e) => {
 
   const remove = e.target.closest('.remove-cat');
   if (remove) {
-    savedCategories = savedCategories.filter((n) => n.toLowerCase() !== remove.dataset.name.toLowerCase());
-    saveCategories();
-    render();
+    change(() => {
+      savedCategories = savedCategories.filter((n) => n.toLowerCase() !== remove.dataset.name.toLowerCase());
+    });
     return;
   }
 
+  if (e.target.closest('.cat-edit')) {
+    startRename(e.target.closest('.side-item'));
+    return;
+  }
+
+  if (e.target.closest('.cat-handle')) return; // a drag, not a click on the category
+
   const btn = e.target.closest('[data-filter]');
   if (!btn) return;
-  filter = filter === btn.dataset.filter ? '' : btn.dataset.filter;
+  if (filter === btn.dataset.filter) return; // already selected: stay here (All tasks goes back to everything)
+  filter = btn.dataset.filter;
   render();
 });
 
