@@ -105,6 +105,15 @@ function render() {
     del.textContent = '×';
     del.setAttribute('aria-label', 'Delete');
 
+    // Only unfinished items can be dragged (finished ones stay at the bottom)
+    if (!item.done) {
+      const handle = document.createElement('span');
+      handle.className = 'handle';
+      handle.textContent = '≡';
+      handle.setAttribute('aria-label', 'Drag to reorder');
+      li.append(handle);
+    }
+
     li.append(checkbox, text);
 
     // On the All tab, show which category the item belongs to
@@ -259,6 +268,52 @@ list.addEventListener('click', (e) => {
   saveItems();
   render();
 });
+
+// Drag the ≡ handle to reorder. Pointer events work for both mouse and touch.
+list.addEventListener('pointerdown', (e) => {
+  if (!e.target.matches('.handle')) return;
+  const handle = e.target;
+  const li = handle.closest('li');
+  handle.setPointerCapture(e.pointerId);
+  li.classList.add('dragging');
+
+  // While dragging, only move the row in the page; save when the finger/mouse is released
+  function move(ev) {
+    const over = document.elementFromPoint(ev.clientX, ev.clientY);
+    const target = over && over.closest('#list li:not(.done)');
+    if (!target || target === li) return;
+    const box = target.getBoundingClientRect();
+    const below = ev.clientY > box.top + box.height / 2;
+    list.insertBefore(li, below ? target.nextSibling : target);
+  }
+
+  function end() {
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', end);
+    handle.removeEventListener('pointercancel', end);
+    const ids = [...list.querySelectorAll('li:not(.done)')].map((el) => el.dataset.id);
+    applyOrder(ids);
+    saveItems();
+    render();
+  }
+
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+});
+
+// Put the shown unfinished items in a new order, using the same slots in `items`
+// (other days, categories and finished items keep their places)
+function applyOrder(ids) {
+  const byId = new Map(items.map((it) => [it.id, it]));
+  const slots = [];
+  items.forEach((it, i) => {
+    if (ids.includes(it.id)) slots.push(i);
+  });
+  slots.forEach((slot, n) => {
+    items[slot] = byId.get(ids[n]);
+  });
+}
 
 // Double-click an item's text to edit it in place
 list.addEventListener('dblclick', (e) => {

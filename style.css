@@ -221,3 +221,16 @@ li.done {
 .text {
   touch-action: manipulation;
 }
+
+/* Drag handle: touch-action none lets a finger drag it without scrolling the page */
+.handle {
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  padding: 0 4px;
+}
+
+li.dragging {
+  background: rgba(0, 0, 0, 0.04);
+}
