@@ -537,7 +537,7 @@ groupsBox.addEventListener('pointerdown', (e) => {
   const handle = e.target;
   const li = handle.closest('li');
   const ul = li.parentElement;
-  handle.setPointerCapture(e.pointerId);
+  e.preventDefault(); // no text selection while dragging
   li.classList.add('dragging');
 
   // While dragging, only move the row in the page; save when the finger/mouse is released
@@ -551,18 +551,18 @@ groupsBox.addEventListener('pointerdown', (e) => {
   }
 
   function end() {
-    handle.removeEventListener('pointermove', move);
-    handle.removeEventListener('pointerup', end);
-    handle.removeEventListener('pointercancel', end);
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', end);
+    document.removeEventListener('pointercancel', end);
     const ids = [...ul.querySelectorAll('li:not(.done)')].map((row) => row.dataset.id);
     applyOrder(ids);
     saveItems();
     render();
   }
 
-  handle.addEventListener('pointermove', move);
-  handle.addEventListener('pointerup', end);
-  handle.addEventListener('pointercancel', end);
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', end);
+  document.addEventListener('pointercancel', end);
 });
 
 // Put the dragged items in a new order, using the same slots in `items`
