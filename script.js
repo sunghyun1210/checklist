@@ -855,36 +855,86 @@ groupsBox.addEventListener('dblclick', (e) => {
   edit.addEventListener('blur', () => finish(true));
 });
 
-// Drag the ≡ handle to reorder inside one date group. Pointer events work for mouse and touch.
-groupsBox.addEventListener('pointerdown', (e) => {
-  if (!e.target.matches('.handle')) return;
-  const li = e.target.closest('li');
-  const ul = li.parentElement;
-  e.preventDefault(); // no text selection while dragging
-  li.classList.add('dragging');
+// Drag to reorder (tasks and categories use the same code).
+// With a mouse you can grab the row anywhere; on a phone only the ≡ handle works,
+// because a finger on the row has to scroll the page.
+//   container   the element that holds the rows
+//   rowSelector which elements are the rows
+//   onDrop(list) is called with the list element after a drag, to save the new order
+function enableDrag(container, rowSelector, onDrop) {
+  container.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const row = e.target.closest(rowSelector);
+    if (!row || !container.contains(row)) return;
 
-  // While dragging, only move the row in the page; save when the finger/mouse is released.
-  // The listeners are on document because moving the row in the DOM cancels pointer capture.
-  function move(ev) {
-    const over = document.elementFromPoint(ev.clientX, ev.clientY);
-    const target = over && over.closest('li:not(.done)');
-    if (!target || target === li || target.parentElement !== ul) return;
-    const box = target.getBoundingClientRect();
-    const below = ev.clientY > box.top + box.height / 2;
-    ul.insertBefore(li, below ? target.nextSibling : target);
-  }
+    const onHandle = e.target.closest('.handle, .cat-handle');
+    if (!onHandle) {
+      if (e.pointerType === 'touch') return; // a finger scrolls; it uses the handle
+      // Checkboxes, delete buttons and text boxes keep their normal behavior
+      if (e.target.closest('input, textarea, select, .delete, .remove-cat, .cat-edit')) return;
+    }
 
-  function end() {
-    document.removeEventListener('pointermove', move);
-    document.removeEventListener('pointerup', end);
-    document.removeEventListener('pointercancel', end);
-    const ids = [...ul.querySelectorAll('li:not(.done)')].map((row) => row.dataset.id);
-    change(() => applyOrder(ids)); // no undo step if the order did not change
-  }
+    const list = row.parentElement;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
 
-  document.addEventListener('pointermove', move);
-  document.addEventListener('pointerup', end);
-  document.addEventListener('pointercancel', end);
+    function begin() {
+      dragging = true;
+      row.classList.add('dragging');
+      document.body.classList.add('drag-active'); // no text selection, grabbing cursor
+      window.getSelection().removeAllRanges();
+    }
+
+    if (onHandle) {
+      e.preventDefault();
+      begin(); // the handle starts right away
+    }
+
+    // While dragging, only move the row in the page; save when the mouse / finger is released.
+    // The listeners are on document because moving the row in the DOM cancels pointer capture.
+    function move(ev) {
+      // Anywhere else: it is only a drag after the mouse moved a few pixels (so clicks still work)
+      if (!dragging) {
+        if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 5) return;
+        begin();
+      }
+      const over = document.elementFromPoint(ev.clientX, ev.clientY);
+      const target = over && over.closest(rowSelector);
+      if (!target || target === row || target.parentElement !== list) return;
+      const box = target.getBoundingClientRect();
+      const below = ev.clientY > box.top + box.height / 2;
+      list.insertBefore(row, below ? target.nextSibling : target);
+    }
+
+    function end() {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', end);
+      document.removeEventListener('pointercancel', end);
+      if (!dragging) return; // it was just a click
+
+      document.body.classList.remove('drag-active');
+      // The click that follows a drag must not select / toggle anything
+      const stopClick = (ev) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      document.addEventListener('click', stopClick, { capture: true, once: true });
+      setTimeout(() => document.removeEventListener('click', stopClick, true), 0);
+
+      onDrop(list); // saves, or just redraws when the order did not change
+    }
+
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', end);
+    document.addEventListener('pointercancel', end);
+  });
+}
+
+// Tasks: reorder inside one date group (finished tasks stay where they are)
+enableDrag(groupsBox, 'li.row:not(.done)', (ul) => {
+  const ids = [...ul.querySelectorAll('li.row:not(.done)')].map((row) => row.dataset.id);
+  change(() => applyOrder(ids)); // no undo step if the order did not change
 });
 
 // Put the dragged items in a new order, using the same slots in `items`
@@ -1032,37 +1082,12 @@ $('category-list').addEventListener('dblclick', (e) => {
   if (row) startRename(row);
 });
 
-// Drag the handle on the left of a category to change the order (the order is saved)
-$('category-list').addEventListener('pointerdown', (e) => {
-  if (!e.target.matches('.cat-handle')) return;
-  const row = e.target.closest('.side-item');
-  const list = $('category-list');
-  e.preventDefault();
-  row.classList.add('dragging');
-
-  // Same idea as dragging tasks: listeners on document, because moving the row cancels pointer capture
-  function move(ev) {
-    const over = document.elementFromPoint(ev.clientX, ev.clientY);
-    const target = over && over.closest('#category-list .side-item');
-    if (!target || target === row) return;
-    const box = target.getBoundingClientRect();
-    const below = ev.clientY > box.top + box.height / 2;
-    list.insertBefore(row, below ? target.nextSibling : target);
-  }
-
-  function end() {
-    document.removeEventListener('pointermove', move);
-    document.removeEventListener('pointerup', end);
-    document.removeEventListener('pointercancel', end);
-    const order = [...list.children].map((btn) => btn.dataset.name);
-    change(() => {
-      savedCategories = order; // every category is saved with its place now
-    });
-  }
-
-  document.addEventListener('pointermove', move);
-  document.addEventListener('pointerup', end);
-  document.addEventListener('pointercancel', end);
+// Categories: reorder them in the sidebar (the order is saved)
+enableDrag($('category-list'), '.side-item', (list) => {
+  const order = [...list.children].map((btn) => btn.dataset.name);
+  change(() => {
+    savedCategories = order; // every category is saved with its place now
+  });
 });
 
 newCategory.addEventListener('keydown', (e) => {

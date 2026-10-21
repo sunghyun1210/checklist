@@ -717,6 +717,23 @@ h2 {
   box-shadow: 0 8px 24px rgba(30, 40, 40, 0.18);
 }
 
+/* Unfinished tasks can be grabbed anywhere; the checkbox and x keep the normal pointer */
+.row:not(.done) {
+  cursor: grab;
+}
+
+.row input[type="checkbox"],
+.delete {
+  cursor: pointer;
+}
+
+/* While something is being dragged: no text selection, grabbing cursor everywhere */
+body.drag-active,
+body.drag-active * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
 /* Editing an item in place */
 .edit {
   flex: 1;
