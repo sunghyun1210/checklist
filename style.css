@@ -838,17 +838,52 @@ body.drag-active * {
 
 /* ---------- Calendar ---------- */
 
+/* Three parts: Today on the left, the month in the exact middle, Monthly | Weekly on the right */
 #cal-nav {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas: "today center mode";
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
 }
 
-/* Monthly | Weekly: right end of the header, above the last weekday */
+#cal-today {
+  grid-area: today;
+  justify-self: start;
+}
+
+#cal-center {
+  grid-area: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 #cal-mode {
-  margin-left: auto;
+  grid-area: mode;
+  justify-self: end;
+}
+
+/* Not enough room for one row (phone, or a window just wide enough for two panes):
+   the month goes on its own row, Today and Monthly | Weekly share the row below */
+@media (max-width: 720px), (min-width: 1151px) and (max-width: 1320px) {
+  #cal-nav {
+    grid-template-columns: auto auto;
+    grid-template-areas:
+      "center center"
+      "today mode";
+    justify-content: space-between;
+  }
+
+  #cal-nav > * {
+    min-width: 0;
+  }
+
+  #cal-center {
+    justify-self: center;
+  }
 }
 
 /* A task dragged from the list over a day: that day lights up */
@@ -859,7 +894,6 @@ body.drag-active * {
   background: #eef5f3;
 }
 
-/* Arrows and Today sit right next to the month / week title */
 #cal-title {
   margin: 0 4px;
   font-size: 1.35rem;

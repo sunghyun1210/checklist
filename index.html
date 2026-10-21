@@ -94,11 +94,14 @@
            Narrow screens show one at a time (the two tabs at the top). -->
       <div id="split" data-pane="list">
         <section id="cal-pane">
+          <!-- Today (left) | previous, month, next (middle) | Monthly / Weekly (right) -->
           <div id="cal-nav">
-            <button type="button" class="round" id="cal-prev" aria-label="Previous">&lsaquo;</button>
-            <h2 id="cal-title"></h2>
-            <button type="button" class="round" id="cal-next" aria-label="Next">&rsaquo;</button>
             <button type="button" id="cal-today">Today</button>
+            <div id="cal-center">
+              <button type="button" class="round" id="cal-prev" aria-label="Previous">&lsaquo;</button>
+              <h2 id="cal-title"></h2>
+              <button type="button" class="round" id="cal-next" aria-label="Next">&rsaquo;</button>
+            </div>
             <nav id="cal-mode" class="seg small"></nav>
           </div>
           <div id="cal-month" class="month"></div>
