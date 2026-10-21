@@ -200,6 +200,18 @@ function render() {
 
   renderSidebar();
   renderChecklist();
+  renderSummary();
+}
+
+// Cards follow the sidebar filter. Overdue items are not counted here (they have their own group).
+function renderSummary() {
+  const mine = filteredItems().filter((it) => !it.done);
+  const today = fromKey(todayKey());
+  const weekEnd = dateKey(addDays(today, 6 - today.getDay())); // the week ends on Saturday
+
+  $('sum-today').textContent = mine.filter((it) => it.due === dateKey(today)).length;
+  $('sum-week').textContent = mine.filter((it) => it.due >= dateKey(today) && it.due <= weekEnd).length;
+  $('sum-done').textContent = filteredItems().filter((it) => it.doneDate === dateKey(today)).length;
 }
 
 function renderSidebar() {
