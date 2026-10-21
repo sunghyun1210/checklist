@@ -260,6 +260,44 @@ list.addEventListener('click', (e) => {
   render();
 });
 
+// Double-click an item's text to edit it in place
+list.addEventListener('dblclick', (e) => {
+  if (!e.target.matches('.text')) return;
+  const item = items.find((it) => it.id === e.target.closest('li').dataset.id);
+
+  // Show the item the way it was typed, so @category and t25 can be edited too
+  const edit = document.createElement('input');
+  edit.type = 'text';
+  edit.className = 'edit';
+  edit.value =
+    (item.category ? '@' + item.category + ' ' : '') +
+    item.text +
+    (item.minutes ? ' t' + item.minutes : '');
+  e.target.replaceWith(edit);
+  edit.focus();
+  edit.select();
+
+  let finished = false; // render() removes the input, which fires blur again
+  function finish(save) {
+    if (finished) return;
+    finished = true;
+    const parsed = parseInput(edit.value);
+    if (save && parsed.text) { // empty text: keep the old item
+      item.text = parsed.text;
+      item.category = parsed.category ? canonicalCategory(parsed.category) : '';
+      item.minutes = parsed.minutes;
+      saveItems();
+    }
+    render();
+  }
+
+  edit.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter') finish(true);
+    if (ev.key === 'Escape') finish(false);
+  });
+  edit.addEventListener('blur', () => finish(true));
+});
+
 // Remove finished items from the current list only
 document.getElementById('clear-done').addEventListener('click', () => {
   const shown = visibleItems();

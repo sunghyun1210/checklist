@@ -207,3 +207,17 @@ li.done {
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+/* Editing an item in place */
+.edit {
+  flex: 1;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
+/* Stops double-tap from zooming the page on phones, so double-tap can edit */
+.text {
+  touch-action: manipulation;
+}
