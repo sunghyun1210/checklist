@@ -1,15 +1,28 @@
 const STORAGE_KEY = 'checklist-v2'; // the old per-day/week/month data is not used any more
 const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
+// Category colors: c = text and dot, s = soft background
+const PALETTE = [
+  { c: '#4f7fd1', s: '#e4ecfa' },
+  { c: '#8b6fc8', s: '#ece6f8' },
+  { c: '#c0894a', s: '#f6ebdc' },
+  { c: '#3f9a8c', s: '#dff0ed' },
+  { c: '#cc6b86', s: '#f8e4ea' },
+  { c: '#6a9a4f', s: '#e7f0df' },
+  { c: '#d1763f', s: '#f9e7db' },
+  { c: '#6b7f99', s: '#e6ebf1' },
+];
+
 const $ = (id) => document.getElementById(id);
 
 // Each item: { id, text, category, minutes, due, done, doneDate }
 // due and doneDate are 'YYYY-MM-DD' strings (doneDate is '' until the item is checked)
 let items = loadItems();
-let view = 'checklist';
-let subView = 'all'; // 'all' shows finished items too, 'todo' hides them
-let filter = ''; // sidebar: '' = everything, 'inbox', or 'cat:' + lowercase category name
-let calMonth = firstOfMonth(new Date()); // the month shown in the calendar
+let view = 'checklist'; // 'checklist' | 'calendar'
+let subList = 'all'; // checklist: 'all' shows finished items too, 'todo' hides them
+let calMode = 'month'; // calendar: 'month' | 'week'
+let filter = ''; // sidebar: '' = everything (Inbox), or 'cat:' + lowercase category name
+let calDate = new Date(); // any day inside the month / week shown in the calendar
 
 // ---------- Storage ----------
 
@@ -67,8 +80,8 @@ function addDays(d, n) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 }
 
-function firstOfMonth(d) {
-  return new Date(d.getFullYear(), d.getMonth(), 1);
+function shortDate(d) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 // Short label for a row: Today, Tmrw, Oct 25
@@ -76,7 +89,7 @@ function dateLabel(key) {
   const today = fromKey(todayKey());
   if (key === dateKey(today)) return 'Today';
   if (key === dateKey(addDays(today, 1))) return 'Tmrw';
-  return fromKey(key).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return shortDate(fromKey(key));
 }
 
 // Heading of a date group: Today, Tomorrow, Sun, Oct 25
@@ -177,10 +190,18 @@ function canonicalCategory(name) {
   return categoryNames().find((n) => n.toLowerCase() === name.toLowerCase()) || name;
 }
 
+// The same name always gets the same color, even when other categories come and go
+function colorize(node, name) {
+  let hash = 0;
+  for (const ch of name.toLowerCase()) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const color = PALETTE[hash % PALETTE.length];
+  node.style.setProperty('--c', color.c);
+  node.style.setProperty('--s', color.s);
+}
+
 function matchesFilter(item) {
-  if (filter === 'inbox') return !item.category;
-  if (filter) return 'cat:' + item.category.toLowerCase() === filter;
-  return true;
+  if (!filter) return true;
+  return 'cat:' + item.category.toLowerCase() === filter;
 }
 
 // Items that pass the sidebar filter
@@ -199,79 +220,41 @@ function el(tag, className, text) {
 }
 
 function render() {
+  $('today-date').textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+
   document.querySelectorAll('#main-tabs button').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.view === view);
+    btn.classList.toggle('on', btn.dataset.view === view);
   });
 
   const calendar = view === 'calendar';
-  $('layout').classList.toggle('calendar-mode', calendar);
   $('checklist-view').hidden = calendar;
-  $('summary').hidden = calendar;
   $('calendar-view').hidden = !calendar;
 
   renderSidebar();
+  renderHead();
   if (calendar) {
     renderCalendar();
   } else {
     renderChecklist();
-    renderSummary();
   }
-}
-
-// Month grid: 6 weeks starting on Sunday. Items follow the sidebar filter.
-function renderCalendar() {
-  $('cal-title').textContent = calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-
-  const grid = $('cal-grid');
-  grid.innerHTML = '';
-  DAYS.forEach((name) => grid.append(el('div', 'cal-head', name.toUpperCase())));
-
-  const today = todayKey();
-  const mine = filteredItems();
-  const start = addDays(calMonth, -calMonth.getDay());
-
-  for (let i = 0; i < 42; i++) {
-    const day = addDays(start, i);
-    const key = dateKey(day);
-    const cell = el('div', 'cal-cell');
-    cell.dataset.date = key;
-    if (day.getMonth() !== calMonth.getMonth()) cell.classList.add('other');
-    if (key === today) cell.classList.add('today');
-    cell.append(el('div', 'cal-day', String(day.getDate())));
-
-    // Show at most 3 items per day, unfinished first
-    const dayItems = mine.filter((it) => it.due === key).sort((a, b) => a.done - b.done);
-    dayItems.slice(0, 3).forEach((it) => {
-      cell.append(el('div', it.done ? 'cal-item done' : 'cal-item', it.text));
-    });
-    if (dayItems.length > 3) cell.append(el('div', 'cal-more', '+' + (dayItems.length - 3) + ' more'));
-    grid.append(cell);
-  }
-}
-
-// Cards follow the sidebar filter. Overdue items are not counted here (they have their own group).
-function renderSummary() {
-  const mine = filteredItems().filter((it) => !it.done);
-  const today = fromKey(todayKey());
-  const weekEnd = dateKey(addDays(today, 6 - today.getDay())); // the week ends on Saturday
-
-  $('sum-today').textContent = mine.filter((it) => it.due === dateKey(today)).length;
-  $('sum-week').textContent = mine.filter((it) => it.due >= dateKey(today) && it.due <= weekEnd).length;
-  $('sum-done').textContent = filteredItems().filter((it) => it.doneDate === dateKey(today)).length;
 }
 
 function renderSidebar() {
   const names = categoryNames();
 
   // The selected category may be gone (its items were deleted): back to everything
-  if (filter.startsWith('cat:') && !names.some((n) => 'cat:' + n.toLowerCase() === filter)) {
+  if (filter && !names.some((n) => 'cat:' + n.toLowerCase() === filter)) {
     filter = '';
   }
 
   const left = (test) => items.filter((it) => !it.done && test(it)).length;
 
-  $('inbox-count').textContent = left((it) => !it.category) || '';
-  document.querySelector('[data-filter="inbox"]').classList.toggle('active', filter === 'inbox');
+  $('inbox-count').textContent = left(() => true) || '';
+  $('inbox').classList.toggle('active', filter === '');
 
   const list = $('category-list');
   list.innerHTML = '';
@@ -281,7 +264,9 @@ function renderSidebar() {
     btn.type = 'button';
     btn.dataset.filter = key;
     btn.classList.toggle('active', filter === key);
+    colorize(btn, name);
     btn.append(
+      el('span', 'dot'),
       el('span', '', name),
       el('span', 'side-count', left((it) => it.category.toLowerCase() === name.toLowerCase()) || '')
     );
@@ -289,20 +274,43 @@ function renderSidebar() {
   });
 }
 
-function renderChecklist() {
-  document.querySelectorAll('#sub-tabs button').forEach((btn) => {
-    btn.classList.toggle('active', btn.dataset.sub === subView);
+// Sub toolbar: the tabs depend on the main tab, the four numbers follow the sidebar filter.
+// Late items are not counted in "Due today" / "This week" (they have their own number).
+function renderHead() {
+  const options =
+    view === 'checklist'
+      ? [['all', 'All'], ['todo', 'To do']]
+      : [['week', 'Weekly'], ['month', 'Monthly']];
+  const current = view === 'checklist' ? subList : calMode;
+
+  const tabs = $('sub-tabs');
+  tabs.innerHTML = '';
+  options.forEach(([key, label]) => {
+    const btn = el('button', current === key ? 'on' : '', label);
+    btn.type = 'button';
+    btn.dataset.sub = key;
+    tabs.append(btn);
   });
 
-  if (filter === 'inbox') {
-    $('view-title').textContent = 'Inbox';
-  } else if (filter) {
+  const mine = filteredItems();
+  const open = mine.filter((it) => !it.done);
+  const today = fromKey(todayKey());
+  const weekEnd = dateKey(addDays(today, 6 - today.getDay())); // the week ends on Saturday
+
+  $('sum-today').textContent = open.filter((it) => it.due === dateKey(today)).length;
+  $('sum-week').textContent = open.filter((it) => it.due >= dateKey(today) && it.due <= weekEnd).length;
+  $('sum-late').textContent = open.filter((it) => it.due < dateKey(today)).length;
+  $('sum-done').textContent = mine.filter((it) => it.doneDate === dateKey(today)).length;
+}
+
+function renderChecklist() {
+  if (filter) {
     $('view-title').textContent = categoryNames().find((n) => 'cat:' + n.toLowerCase() === filter);
   } else {
-    $('view-title').textContent = subView === 'all' ? 'All tasks' : 'To do';
+    $('view-title').textContent = 'Inbox';
   }
 
-  const shown = filteredItems().filter((it) => subView === 'all' || !it.done);
+  const shown = filteredItems().filter((it) => subList === 'all' || !it.done);
   const today = todayKey();
 
   // Unfinished items that are past due go into one Overdue group on top
@@ -337,11 +345,11 @@ function renderChecklist() {
   if (minutesLeft) text += ' · ' + formatMinutes(minutesLeft);
   $('count').textContent = text;
   $('footer').hidden = shown.length === 0;
-  $('clear-done').hidden = subView === 'todo'; // nothing finished is shown there
+  $('clear-done').hidden = subList === 'todo'; // nothing finished is shown there
 }
 
 function makeRow(item) {
-  const li = el('li');
+  const li = el('li', 'row');
   li.dataset.id = item.id;
   li.classList.toggle('done', item.done);
 
@@ -358,17 +366,103 @@ function makeRow(item) {
   li.append(checkbox, el('span', 'text', item.text));
 
   // Show the category label unless a category is already selected in the sidebar
-  if (item.category && !filter.startsWith('cat:')) li.append(el('span', 'tag', item.category));
-  if (item.minutes) li.append(el('span', 'time', formatMinutes(item.minutes)));
+  if (item.category && !filter) {
+    const tag = el('span', 'pill cat', item.category);
+    colorize(tag, item.category);
+    li.append(tag);
+  }
+  if (item.minutes) li.append(el('span', 'pill', formatMinutes(item.minutes)));
 
   const late = !item.done && item.due < todayKey();
-  li.append(el('span', late ? 'date late' : 'date', dateLabel(item.due)));
+  li.append(el('span', late ? 'pill late' : 'pill', dateLabel(item.due)));
 
   const del = el('button', 'delete', '×');
   del.type = 'button';
   del.setAttribute('aria-label', 'Delete');
   li.append(del);
   return li;
+}
+
+// ---------- Calendar ----------
+
+// "Oct 18 - 24, 2026" (or "Oct 26 - Nov 1, 2026" when the week crosses a month)
+function weekTitle(start) {
+  const end = addDays(start, 6);
+  const endText = start.getMonth() === end.getMonth() ? end.getDate() : shortDate(end);
+  return shortDate(start) + ' – ' + endText + ', ' + end.getFullYear();
+}
+
+// A task shown inside a day, in its category color
+function makeEvent(item, showTime) {
+  const ev = el('div', item.done ? 'ev done' : 'ev', item.text);
+  if (item.category) colorize(ev, item.category);
+  if (showTime && item.minutes) ev.append(el('em', '', formatMinutes(item.minutes)));
+  return ev;
+}
+
+// Unfinished first, finished at the end
+function itemsOn(key) {
+  return filteredItems().filter((it) => it.due === key).sort((a, b) => a.done - b.done);
+}
+
+function renderCalendar() {
+  const week = calMode === 'week';
+  $('cal-month').hidden = week;
+  $('cal-week').hidden = !week;
+
+  const today = todayKey();
+
+  if (week) {
+    const start = addDays(calDate, -calDate.getDay()); // weeks start on Sunday
+    $('cal-title').textContent = weekTitle(start);
+
+    const grid = $('cal-week');
+    grid.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(start, i);
+      const key = dateKey(day);
+      const col = el('div', key === today ? 'col today' : 'col');
+      col.dataset.date = key;
+
+      const header = el('header');
+      header.append(el('small', '', DAYS[i].toUpperCase()), el('b', '', String(day.getDate())));
+      col.append(header);
+
+      const dayItems = itemsOn(key);
+      dayItems.forEach((it) => col.append(makeEvent(it, true)));
+      if (!dayItems.length) col.append(el('div', 'empty', '·'));
+      grid.append(col);
+    }
+    return;
+  }
+
+  // Month: only the weeks that belong to this month, so the tiles can be as tall as possible
+  const first = new Date(calDate.getFullYear(), calDate.getMonth(), 1);
+  const daysInMonth = new Date(calDate.getFullYear(), calDate.getMonth() + 1, 0).getDate();
+  const weeks = Math.ceil((first.getDay() + daysInMonth) / 7);
+  const start = addDays(first, -first.getDay());
+  $('cal-title').textContent = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const grid = $('cal-month');
+  grid.innerHTML = '';
+  grid.style.gridTemplateRows = 'auto repeat(' + weeks + ', minmax(0, 1fr))';
+  DAYS.forEach((name) => grid.append(el('div', 'weekday', name.toUpperCase())));
+
+  for (let i = 0; i < weeks * 7; i++) {
+    const day = addDays(start, i);
+    const key = dateKey(day);
+    const cell = el('div', 'cell');
+    cell.dataset.date = key;
+    if (day.getMonth() !== first.getMonth()) cell.classList.add('other');
+    if (key === today) cell.classList.add('today');
+    cell.append(el('span', 'day', String(day.getDate())));
+
+    // At most 3 tasks per day, the rest is "+N more" (the Weekly view shows everything)
+    const dayItems = itemsOn(key);
+    dayItems.slice(0, 3).forEach((it) => cell.append(makeEvent(it, false)));
+    if (dayItems.length > 3) cell.append(el('div', 'more', '+' + (dayItems.length - 3) + ' more'));
+    grid.append(cell);
+  }
 }
 
 // ---------- New task popup ----------
@@ -534,13 +628,13 @@ groupsBox.addEventListener('dblclick', (e) => {
 // Drag the ≡ handle to reorder inside one date group. Pointer events work for mouse and touch.
 groupsBox.addEventListener('pointerdown', (e) => {
   if (!e.target.matches('.handle')) return;
-  const handle = e.target;
-  const li = handle.closest('li');
+  const li = e.target.closest('li');
   const ul = li.parentElement;
   e.preventDefault(); // no text selection while dragging
   li.classList.add('dragging');
 
-  // While dragging, only move the row in the page; save when the finger/mouse is released
+  // While dragging, only move the row in the page; save when the finger/mouse is released.
+  // The listeners are on document because moving the row in the DOM cancels pointer capture.
   function move(ev) {
     const over = document.elementFromPoint(ev.clientX, ev.clientY);
     const target = over && over.closest('li:not(.done)');
@@ -578,7 +672,14 @@ function applyOrder(ids) {
   });
 }
 
-// ---------- Toolbars and sidebar ----------
+// Remove finished items that match the sidebar filter
+$('clear-done').addEventListener('click', () => {
+  items = items.filter((it) => !(it.done && matchesFilter(it)));
+  saveItems();
+  render();
+});
+
+// ---------- Toolbars, sidebar and calendar buttons ----------
 
 $('main-tabs').addEventListener('click', (e) => {
   if (!e.target.dataset.view) return;
@@ -586,35 +687,18 @@ $('main-tabs').addEventListener('click', (e) => {
   render();
 });
 
-// Calendar: previous / next month, back to this month
-$('cal-prev').addEventListener('click', () => {
-  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
-  render();
-});
-
-$('cal-next').addEventListener('click', () => {
-  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
-  render();
-});
-
-$('cal-today').addEventListener('click', () => {
-  calMonth = firstOfMonth(new Date());
-  render();
-});
-
-// Click a day to add a task on that date
-$('cal-grid').addEventListener('click', (e) => {
-  const cell = e.target.closest('.cal-cell');
-  if (cell) openTaskDialog(cell.dataset.date);
-});
-
 $('sub-tabs').addEventListener('click', (e) => {
-  if (!e.target.dataset.sub) return;
-  subView = e.target.dataset.sub;
+  const key = e.target.dataset.sub;
+  if (!key) return;
+  if (view === 'checklist') {
+    subList = key;
+  } else {
+    calMode = key;
+  }
   render();
 });
 
-// Click a sidebar item to filter; click it again to go back to everything
+// Click a category to filter; click it again (or Inbox) to see everything
 $('sidebar').addEventListener('click', (e) => {
   const btn = e.target.closest('[data-filter]');
   if (!btn) return;
@@ -622,11 +706,28 @@ $('sidebar').addEventListener('click', (e) => {
   render();
 });
 
-// Remove finished items that match the sidebar filter
-$('clear-done').addEventListener('click', () => {
-  items = items.filter((it) => !(it.done && matchesFilter(it)));
-  saveItems();
+// Previous / next moves by a month or a week, depending on the calendar tab
+function shiftCalendar(dir) {
+  if (calMode === 'week') {
+    calDate = addDays(calDate, dir * 7);
+  } else {
+    calDate = new Date(calDate.getFullYear(), calDate.getMonth() + dir, 1);
+  }
   render();
+}
+
+$('cal-prev').addEventListener('click', () => shiftCalendar(-1));
+$('cal-next').addEventListener('click', () => shiftCalendar(1));
+
+$('cal-today').addEventListener('click', () => {
+  calDate = new Date();
+  render();
+});
+
+// Click an empty spot of a day to add a task on that date
+$('calendar-view').addEventListener('click', (e) => {
+  const day = e.target.closest('[data-date]');
+  if (day) openTaskDialog(day.dataset.date);
 });
 
 render();

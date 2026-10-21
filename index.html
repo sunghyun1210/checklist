@@ -7,9 +7,10 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Main toolbar -->
+  <!-- Main toolbar: date | main tabs | new task -->
   <header id="topbar">
-    <nav id="main-tabs">
+    <div id="today-date"></div>
+    <nav id="main-tabs" class="seg">
       <button type="button" data-view="checklist">Checklist</button>
       <button type="button" data-view="calendar">Calendar</button>
     </nav>
@@ -17,24 +18,34 @@
   </header>
 
   <div id="layout">
-    <!-- Left: Inbox and categories (filled by script.js) -->
+    <!-- Left: Inbox (everything), categories, settings -->
     <aside id="sidebar">
-      <button type="button" class="side-item" data-filter="inbox">
-        <span>Inbox</span><span id="inbox-count" class="side-count"></span>
+      <button type="button" class="side-item" id="inbox" data-filter="">
+        <span class="dot"></span><span>Inbox</span><span id="inbox-count" class="side-count"></span>
       </button>
       <h2 class="side-heading">Categories</h2>
       <div id="category-list"></div>
-      <button type="button" class="side-item" id="open-settings">Settings</button>
+
+      <!-- Bottom left: settings, with the undo / redo buttons next to it -->
+      <div id="sidebar-bottom">
+        <button type="button" class="side-item" id="open-settings">Settings</button>
+      </div>
     </aside>
 
     <main id="content">
-      <section id="checklist-view">
-        <!-- Sub toolbar: All shows finished items too, To do hides them -->
-        <nav id="sub-tabs">
-          <button type="button" data-sub="all">All</button>
-          <button type="button" data-sub="todo">To do</button>
-        </nav>
+      <!-- Sub toolbar: tabs on the left, numbers on the right -->
+      <div id="head">
+        <nav id="sub-tabs" class="seg small"></nav>
+        <div id="stats">
+          <span class="vrule"></span>
+          <div class="stat"><small>Due today</small><b id="sum-today"></b></div>
+          <div class="stat"><small>This week</small><b id="sum-week"></b></div>
+          <div class="stat"><small>Late</small><b id="sum-late"></b></div>
+          <div class="stat"><small>Done</small><b id="sum-done"></b></div>
+        </div>
+      </div>
 
+      <section id="checklist-view">
         <h2 id="view-title"></h2>
         <div id="groups"></div>
 
@@ -46,21 +57,15 @@
 
       <section id="calendar-view" hidden>
         <div id="cal-nav">
-          <button type="button" id="cal-prev" aria-label="Previous month">&lsaquo;</button>
+          <button type="button" class="round" id="cal-prev" aria-label="Previous">&lsaquo;</button>
           <h2 id="cal-title"></h2>
-          <button type="button" id="cal-next" aria-label="Next month">&rsaquo;</button>
+          <button type="button" class="round" id="cal-next" aria-label="Next">&rsaquo;</button>
           <button type="button" id="cal-today">Today</button>
         </div>
-        <div id="cal-grid"></div>
+        <div id="cal-month" class="month"></div>
+        <div id="cal-week" class="week" hidden></div>
       </section>
     </main>
-
-    <!-- Right: small summary cards (numbers are filled by script.js) -->
-    <aside id="summary">
-      <div class="card"><span class="card-label">Due today</span><span id="sum-today" class="card-num"></span></div>
-      <div class="card"><span class="card-label">This week</span><span id="sum-week" class="card-num"></span></div>
-      <div class="card"><span class="card-label">Done today</span><span id="sum-done" class="card-num"></span></div>
-    </aside>
   </div>
 
   <!-- New task popup -->
