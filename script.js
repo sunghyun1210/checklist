@@ -1,5 +1,6 @@
 const STORAGE_KEY = 'checklist-v2'; // the old per-day/week/month data is not used any more
 const CATEGORY_KEY = 'checklist-v2-categories';
+const FOLD_KEY = 'checklist-v2-folded'; // which sidebar groups are folded (a convenience, not task data)
 const DAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
 
 // Category colors: c = text and dot, s = soft background
@@ -23,8 +24,12 @@ let savedCategories = loadCategories(); // names made with "+ Add category"; the
 let view = 'checklist'; // 'checklist' | 'calendar'
 let subList = 'all'; // checklist: 'all' shows finished items too, 'todo' hides them
 let calMode = 'month'; // calendar: 'month' | 'week'
-let filter = ''; // sidebar: '' = everything (Inbox), or 'cat:' + lowercase category name
+// sidebar filter: '' = everything (Inbox), 'cat:' + lowercase category name,
+// or 'smart:today' | 'smart:next' | 'smart:overdue' | 'smart:completed'
+let filter = '';
+let query = ''; // text typed in the search box (lowercase)
 let calDate = new Date(); // any day inside the month / week shown in the calendar
+let miniMonth = new Date(); // month shown in the small calendar in the sidebar
 let undoStack = []; // older versions of `items` (as JSON text), newest last
 let redoStack = []; // versions that were undone
 
@@ -151,6 +156,15 @@ function groupTitle(key) {
   });
 }
 
+// Heading in the Completed list: Today, Yesterday, Mon, Oct 19 ('' = finished before dates were saved)
+function doneTitle(key) {
+  if (!key) return 'Earlier';
+  const today = fromKey(todayKey());
+  if (key === dateKey(today)) return 'Today';
+  if (key === dateKey(addDays(today, -1))) return 'Yesterday';
+  return fromKey(key).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
 // ---------- Typing shortcuts: @category, t25, d10/25 ----------
 
 // The part after "d": 10/25, +3, tom, today, mon ... sun  ->  '2026-10-25' ('' if invalid)
@@ -246,14 +260,41 @@ function colorize(node, name) {
   node.style.setProperty('--s', color.s);
 }
 
+const SMART_TITLES = {
+  today: 'Today',
+  next: 'Next 7 days',
+  overdue: 'Overdue',
+  completed: 'Completed',
+};
+
+// Smart lists: Today = due today, Next 7 days = unfinished from tomorrow on,
+// Overdue = unfinished and past due, Completed = finished
+function matchesSmart(kind, item) {
+  const today = fromKey(todayKey());
+  const key = dateKey(today);
+  if (kind === 'today') return item.due === key;
+  if (kind === 'next') return !item.done && item.due > key && item.due <= dateKey(addDays(today, 7));
+  if (kind === 'overdue') return !item.done && item.due < key;
+  return item.done; // completed
+}
+
 function matchesFilter(item) {
   if (!filter) return true;
+  if (filter.startsWith('smart:')) return matchesSmart(filter.slice(6), item);
   return 'cat:' + item.category.toLowerCase() === filter;
 }
 
-// Items that pass the sidebar filter
+function matchesQuery(item) {
+  return item.text.toLowerCase().includes(query);
+}
+
+// What the person is looking at: the sidebar filter and the search box together
+function isVisible(item) {
+  return matchesFilter(item) && matchesQuery(item);
+}
+
 function filteredItems() {
-  return items.filter(matchesFilter);
+  return items.filter(isVisible);
 }
 
 // ---------- Rendering ----------
@@ -271,6 +312,7 @@ function render() {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
   });
 
   document.querySelectorAll('#main-tabs button').forEach((btn) => {
@@ -285,6 +327,7 @@ function render() {
   $('redo').disabled = !redoStack.length;
 
   renderSidebar();
+  renderMiniCalendar();
   renderHead();
   if (calendar) {
     renderCalendar();
@@ -297,7 +340,7 @@ function renderSidebar() {
   const names = categoryNames();
 
   // The selected category may be gone (its items were deleted): back to everything
-  if (filter && !names.some((n) => 'cat:' + n.toLowerCase() === filter)) {
+  if (filter.startsWith('cat:') && !names.some((n) => 'cat:' + n.toLowerCase() === filter)) {
     filter = '';
   }
 
@@ -305,6 +348,16 @@ function renderSidebar() {
 
   $('inbox-count').textContent = left(() => true) || '';
   $('inbox').classList.toggle('active', filter === '');
+
+  // Smart lists: highlight the selected one and show the numbers
+  document.querySelectorAll('#group-inbox [data-filter^="smart:"]').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+  });
+  document.querySelectorAll('[data-smart]').forEach((count) => {
+    const kind = count.dataset.smart;
+    const n = items.filter((it) => (kind === 'completed' ? it.done : !it.done) && matchesSmart(kind, it)).length;
+    count.textContent = n || '';
+  });
 
   const list = $('category-list');
   list.innerHTML = '';
@@ -331,6 +384,35 @@ function renderSidebar() {
     }
     list.append(btn);
   });
+}
+
+// Small month in the sidebar: a dot under every day that has tasks
+function renderMiniCalendar() {
+  const first = new Date(miniMonth.getFullYear(), miniMonth.getMonth(), 1);
+  const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const weeks = Math.ceil((first.getDay() + daysInMonth) / 7);
+  const start = addDays(first, -first.getDay());
+  $('mini-title').textContent = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const grid = $('mini-grid');
+  grid.innerHTML = '';
+  ['S', 'M', 'T', 'W', 'T', 'F', 'S'].forEach((letter) => grid.append(el('span', '', letter)));
+
+  const withTasks = new Set(items.map((it) => it.due));
+  const today = todayKey();
+  for (let i = 0; i < weeks * 7; i++) {
+    const day = addDays(start, i);
+    const key = dateKey(day);
+    const classes = [];
+    if (day.getMonth() !== first.getMonth()) classes.push('other');
+    if (key === today) classes.push('today');
+    if (withTasks.has(key)) classes.push('has');
+
+    const btn = el('button', classes.join(' '), String(day.getDate()));
+    btn.type = 'button';
+    btn.dataset.day = key;
+    grid.append(btn);
+  }
 }
 
 // Sub toolbar: the tabs depend on the main tab, the four numbers follow the sidebar filter.
@@ -363,33 +445,45 @@ function renderHead() {
 }
 
 function renderChecklist() {
-  if (filter) {
-    $('view-title').textContent = categoryNames().find((n) => 'cat:' + n.toLowerCase() === filter);
-  } else {
-    $('view-title').textContent = 'Inbox';
+  let title = 'All tasks';
+  if (filter.startsWith('smart:')) {
+    title = SMART_TITLES[filter.slice(6)];
+  } else if (filter) {
+    title = categoryNames().find((n) => 'cat:' + n.toLowerCase() === filter);
   }
+  $('view-title').textContent = query ? title + ' · “' + query + '”' : title;
 
-  const shown = filteredItems().filter((it) => subList === 'all' || !it.done);
+  const completedList = filter === 'smart:completed'; // always shows finished items
+  const shown = filteredItems().filter((it) => subList === 'all' || completedList || !it.done);
   const today = todayKey();
-
-  // Unfinished items that are past due go into one Overdue group on top
   const groups = [];
-  const overdue = shown.filter((it) => !it.done && it.due < today);
-  if (overdue.length) groups.push({ title: 'Overdue', items: overdue, late: true });
 
-  // Everything else is grouped by date, unfinished first and finished (faded) at the bottom
-  const rest = shown.filter((it) => !overdue.includes(it));
-  [...new Set(rest.map((it) => it.due))].sort().forEach((due) => {
-    groups.push({
-      title: groupTitle(due),
-      items: rest.filter((it) => it.due === due).sort((a, b) => a.done - b.done), // stable sort
+  if (completedList) {
+    // Finished items, newest first, grouped by the day they were finished
+    [...new Set(shown.map((it) => it.doneDate))].sort().reverse().forEach((day) => {
+      groups.push({ title: doneTitle(day), items: shown.filter((it) => it.doneDate === day) });
     });
-  });
+  } else {
+    // Unfinished items that are past due go into one Overdue group on top
+    const overdue = shown.filter((it) => !it.done && it.due < today);
+    if (overdue.length) groups.push({ title: 'Overdue', items: overdue, late: true });
+
+    // Everything else is grouped by date, unfinished first and finished (faded) at the bottom
+    const rest = shown.filter((it) => !overdue.includes(it));
+    [...new Set(rest.map((it) => it.due))].sort().forEach((due) => {
+      groups.push({
+        title: groupTitle(due),
+        date: due,
+        items: rest.filter((it) => it.due === due).sort((a, b) => a.done - b.done), // stable sort
+      });
+    });
+  }
 
   const box = $('groups');
   box.innerHTML = '';
   groups.forEach((group) => {
     const section = el('section', 'group');
+    if (group.date) section.dataset.date = group.date; // so the small calendar can scroll here
     const heading = el('h3', group.late ? 'overdue' : '', group.title);
     if (group.late) {
       const move = el('button', 'move-all', 'Move all to today');
@@ -429,16 +523,19 @@ function makeRow(item) {
   checkbox.checked = item.done;
   li.append(checkbox, el('span', 'text', item.text));
 
-  // Show the category label unless a category is already selected in the sidebar
-  if (item.category && !filter) {
+  // The small labels live in one box, so a phone can move them to a second line.
+  // Category label: not shown when a category is already selected in the sidebar.
+  const meta = el('span', 'meta');
+  if (item.category && !filter.startsWith('cat:')) {
     const tag = el('span', 'pill cat', item.category);
     colorize(tag, item.category);
-    li.append(tag);
+    meta.append(tag);
   }
-  if (item.minutes) li.append(el('span', 'pill', formatMinutes(item.minutes)));
+  if (item.minutes) meta.append(el('span', 'pill', formatMinutes(item.minutes)));
 
   const late = !item.done && item.due < todayKey();
-  li.append(el('span', late ? 'pill late' : 'pill', dateLabel(item.due)));
+  meta.append(el('span', late ? 'pill late' : 'pill', dateLabel(item.due)));
+  li.append(meta);
 
   const del = el('button', 'delete', '×');
   del.type = 'button';
@@ -666,7 +763,7 @@ groupsBox.addEventListener('click', (e) => {
   if (e.target.matches('.move-all')) {
     change(() => {
       items.forEach((it) => {
-        if (!it.done && it.due < todayKey() && matchesFilter(it)) it.due = todayKey();
+        if (!it.done && it.due < todayKey() && isVisible(it)) it.due = todayKey();
       });
     });
     return;
@@ -778,7 +875,7 @@ function applyOrder(ids) {
 // Remove finished items that match the sidebar filter
 $('clear-done').addEventListener('click', () => {
   change(() => {
-    items = items.filter((it) => !(it.done && matchesFilter(it)));
+    items = items.filter((it) => !(it.done && isVisible(it)));
   });
 });
 
@@ -860,7 +957,43 @@ newCategory.addEventListener('keydown', (e) => {
 newCategory.addEventListener('blur', () => finishNewCategory(true));
 
 // Click a category to filter; click it again (or Inbox) to see everything
+// Fold / unfold a sidebar group (Inbox, Categories) and remember it
+function loadFolded() {
+  try {
+    const data = JSON.parse(localStorage.getItem(FOLD_KEY));
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function applyFolded() {
+  const folded = loadFolded();
+  document.querySelectorAll('.side-group').forEach((group) => {
+    const isFolded = folded.includes(group.id);
+    group.classList.toggle('collapsed', isFolded);
+    group.querySelector('[data-toggle]').setAttribute('aria-expanded', String(!isFolded));
+  });
+}
+
+function toggleGroup(id) {
+  const folded = loadFolded().filter((name) => name !== id);
+  if (!$(id).classList.contains('collapsed')) folded.push(id); // it is open now, so fold it
+  try {
+    localStorage.setItem(FOLD_KEY, JSON.stringify(folded));
+  } catch (e) {
+    // storage not available: the fold still works until the page is reloaded
+  }
+  applyFolded();
+}
+
 $('sidebar').addEventListener('click', (e) => {
+  const toggle = e.target.closest('[data-toggle]');
+  if (toggle) {
+    toggleGroup(toggle.dataset.toggle);
+    return;
+  }
+
   const remove = e.target.closest('.remove-cat');
   if (remove) {
     savedCategories = savedCategories.filter((n) => n.toLowerCase() !== remove.dataset.name.toLowerCase());
@@ -873,6 +1006,61 @@ $('sidebar').addEventListener('click', (e) => {
   if (!btn) return;
   filter = filter === btn.dataset.filter ? '' : btn.dataset.filter;
   render();
+});
+
+// Search box: filters the list and the calendar while typing. "/" jumps into it, Esc clears it.
+const searchBox = $('search-box');
+
+function setQuery() {
+  query = searchBox.value.trim().toLowerCase();
+  $('search').classList.toggle('filled', searchBox.value !== '');
+  render(); // the search box itself is not redrawn, so typing is not interrupted
+}
+
+searchBox.addEventListener('input', setQuery);
+searchBox.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  searchBox.value = '';
+  setQuery();
+  searchBox.blur();
+});
+
+$('search-clear').addEventListener('click', () => {
+  searchBox.value = '';
+  setQuery();
+  searchBox.focus();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.closest && e.target.closest('input:not([type="checkbox"]), textarea, select')) return;
+  if (document.querySelector('dialog[open]')) return;
+  e.preventDefault(); // so "/" is not typed into the box
+  searchBox.focus();
+});
+
+// Small calendar: previous / next month, and click a day to jump there
+$('mini-prev').addEventListener('click', () => {
+  miniMonth = new Date(miniMonth.getFullYear(), miniMonth.getMonth() - 1, 1);
+  renderMiniCalendar();
+});
+
+$('mini-next').addEventListener('click', () => {
+  miniMonth = new Date(miniMonth.getFullYear(), miniMonth.getMonth() + 1, 1);
+  renderMiniCalendar();
+});
+
+$('mini-grid').addEventListener('click', (e) => {
+  const key = e.target.dataset.day;
+  if (!key) return;
+  if (view === 'calendar') {
+    calDate = fromKey(key); // the month / week of that day
+    render();
+  } else {
+    // Checklist: scroll to that day's group (nothing happens when it has no tasks)
+    const group = document.querySelector('#groups [data-date="' + key + '"]');
+    if (group) group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 });
 
 // Previous / next moves by a month or a week, depending on the calendar tab
@@ -899,4 +1087,5 @@ $('calendar-view').addEventListener('click', (e) => {
   if (day) openTaskDialog(day.dataset.date);
 });
 
+applyFolded(); // restore which sidebar groups were folded
 render();

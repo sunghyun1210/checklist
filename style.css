@@ -32,8 +32,11 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, "Segoe UI", sans-serif;
+  /* Smooth Latin fonts first; Korean text falls back to Malgun Gothic / Apple SD Gothic Neo */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* 16px font stops iOS from zooming into inputs */
@@ -51,8 +54,15 @@ button {
   cursor: pointer;
 }
 
+/* One weight for all headings and bold numbers, so everything looks the same */
+h2,
+b {
+  font-weight: 600;
+}
+
 h2 {
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 /* ---------- Main toolbar ---------- */
@@ -65,8 +75,10 @@ h2 {
 }
 
 #today-date {
-  color: var(--muted);
+  color: var(--text);
+  font-size: 1.25rem;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* Pill shaped tab group, used for the main tabs and the sub tabs */
@@ -116,7 +128,7 @@ h2 {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 188px minmax(0, 1fr);
+  grid-template-columns: 216px minmax(0, 1fr);
   gap: 16px;
   padding: 0 20px 20px;
 }
@@ -129,12 +141,49 @@ h2 {
   overflow-y: auto;
 }
 
+/* Sidebar groups (Inbox, Categories): same title, same rows, both can be folded */
+.side-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+
+.side-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.side-group.collapsed .side-body {
+  display: none;
+}
+
 .side-heading {
-  margin: 18px 12px 6px;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 999px;
   color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.side-heading:hover {
+  color: var(--text);
+}
+
+.chev {
+  transition: transform 0.15s;
+}
+
+.side-group.collapsed .chev {
+  transform: rotate(-90deg);
 }
 
 #category-list {
@@ -155,6 +204,159 @@ h2 {
 
 .side-item.add {
   color: var(--muted);
+}
+
+.side-item svg {
+  flex-shrink: 0;
+}
+
+/* Search box: a soft pill like the tab groups, white with a green ring while typing */
+#search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px 8px 14px;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--muted);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+#search:focus-within {
+  background: var(--card);
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow);
+  color: var(--accent);
+}
+
+#search input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+}
+
+#search input::placeholder {
+  color: var(--muted);
+}
+
+/* "/" hint: only while the box is empty and not focused */
+#search kbd {
+  padding: 0 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.72rem;
+}
+
+#search:focus-within kbd,
+#search.filled kbd {
+  display: none;
+}
+
+#search-clear {
+  display: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+}
+
+#search.filled #search-clear {
+  display: block;
+}
+
+/* Small month calendar above Settings */
+#minical {
+  margin-top: auto;
+  padding: 10px 8px 8px;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
+#mini-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 4px 6px;
+  font-size: 0.9rem;
+}
+
+#mini-head button {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 17px;
+  line-height: 1;
+}
+
+#mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+#mini-grid span,
+#mini-grid button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+}
+
+#mini-grid span {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 600;
+}
+
+#mini-grid button.other {
+  opacity: 0.35;
+}
+
+#mini-grid button.today {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* A dot under a day that has tasks */
+#mini-grid button.has::after {
+  content: "";
+  position: absolute;
+  bottom: 1px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+#mini-grid button.today.has::after {
+  background: #fff;
+}
+
+/* Not enough height for the small calendar: hide it */
+@media (max-height: 840px) {
+  #minical {
+    display: none;
+  }
+
+  #sidebar-bottom {
+    margin-top: auto; /* Settings goes back to the very bottom */
+  }
 }
 
 /* Name box that replaces the "+ Add category" button while typing */
@@ -206,7 +408,7 @@ h2 {
 
 /* margin-top: auto pushes this row to the very bottom of the sidebar */
 #sidebar-bottom {
-  margin-top: auto;
+  margin-top: 12px; /* the small calendar above takes the free space (margin-top: auto) */
   display: flex;
   align-items: center;
   gap: 6px;
@@ -273,7 +475,7 @@ h2 {
 .stat small {
   display: block;
   font-size: 0.62rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -397,6 +599,11 @@ h2 {
   touch-action: manipulation; /* stops double-tap zoom, so double-tap can edit */
 }
 
+/* On a computer the labels sit in the row itself; the phone styles below give the box a line of its own */
+.meta {
+  display: contents;
+}
+
 /* Small rounded labels: category, time, date */
 .pill {
   padding: 1px 10px;
@@ -491,8 +698,9 @@ h2 {
   margin-bottom: 10px;
 }
 
+/* Arrows and Today sit right next to the month / week title */
 #cal-title {
-  margin: 0 auto 0 4px;
+  margin: 0 4px;
   font-size: 1.35rem;
 }
 
@@ -526,7 +734,7 @@ h2 {
 .weekday {
   text-align: center;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--muted);
 }
@@ -622,7 +830,7 @@ h2 {
 
 .col header small {
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   color: var(--muted);
 }
@@ -775,9 +983,29 @@ dialog::backdrop {
     padding: 12px 16px;
   }
 
-  /* No room for the date next to the tabs */
+  /* No room for the date next to the tabs: tabs go to the middle */
   #today-date {
     display: none;
+  }
+
+  #topbar {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* Task card: title and buttons on the first line, labels on a second line under the title */
+  .row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
+  .meta {
+    order: 1;
+    flex: 0 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-left: 54px;
   }
 
   #cal-title {
@@ -808,6 +1036,24 @@ dialog::backdrop {
   #new-category {
     flex-shrink: 0;
     width: 150px;
+  }
+
+  /* Search, smart lists and categories all sit in the same sideways row */
+  #search {
+    flex: 0 0 150px;
+    margin-bottom: 0;
+  }
+
+  #search kbd,
+  #minical {
+    display: none;
+  }
+
+  /* The groups dissolve, so all the pills flow in one row (folding is for the computer view) */
+  .side-group,
+  .side-body,
+  .side-group.collapsed .side-body {
+    display: contents;
   }
 
   .side-item {
