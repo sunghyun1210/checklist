@@ -9,6 +9,7 @@ let items = loadItems();
 let view = 'checklist';
 let subView = 'all'; // 'all' shows finished items too, 'todo' hides them
 let filter = ''; // sidebar: '' = everything, 'inbox', or 'cat:' + lowercase category name
+let calMonth = firstOfMonth(new Date()); // the month shown in the calendar
 
 // ---------- Storage ----------
 
@@ -64,6 +65,10 @@ function todayKey() {
 
 function addDays(d, n) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+
+function firstOfMonth(d) {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
 // Short label for a row: Today, Tmrw, Oct 25
@@ -198,9 +203,50 @@ function render() {
     btn.classList.toggle('active', btn.dataset.view === view);
   });
 
+  const calendar = view === 'calendar';
+  $('layout').classList.toggle('calendar-mode', calendar);
+  $('checklist-view').hidden = calendar;
+  $('summary').hidden = calendar;
+  $('calendar-view').hidden = !calendar;
+
   renderSidebar();
-  renderChecklist();
-  renderSummary();
+  if (calendar) {
+    renderCalendar();
+  } else {
+    renderChecklist();
+    renderSummary();
+  }
+}
+
+// Month grid: 6 weeks starting on Sunday. Items follow the sidebar filter.
+function renderCalendar() {
+  $('cal-title').textContent = calMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const grid = $('cal-grid');
+  grid.innerHTML = '';
+  DAYS.forEach((name) => grid.append(el('div', 'cal-head', name.toUpperCase())));
+
+  const today = todayKey();
+  const mine = filteredItems();
+  const start = addDays(calMonth, -calMonth.getDay());
+
+  for (let i = 0; i < 42; i++) {
+    const day = addDays(start, i);
+    const key = dateKey(day);
+    const cell = el('div', 'cal-cell');
+    cell.dataset.date = key;
+    if (day.getMonth() !== calMonth.getMonth()) cell.classList.add('other');
+    if (key === today) cell.classList.add('today');
+    cell.append(el('div', 'cal-day', String(day.getDate())));
+
+    // Show at most 3 items per day, unfinished first
+    const dayItems = mine.filter((it) => it.due === key).sort((a, b) => a.done - b.done);
+    dayItems.slice(0, 3).forEach((it) => {
+      cell.append(el('div', it.done ? 'cal-item done' : 'cal-item', it.text));
+    });
+    if (dayItems.length > 3) cell.append(el('div', 'cal-more', '+' + (dayItems.length - 3) + ' more'));
+    grid.append(cell);
+  }
 }
 
 // Cards follow the sidebar filter. Overdue items are not counted here (they have their own group).
@@ -485,6 +531,34 @@ function applyOrder(ids) {
 }
 
 // ---------- Toolbars and sidebar ----------
+
+$('main-tabs').addEventListener('click', (e) => {
+  if (!e.target.dataset.view) return;
+  view = e.target.dataset.view;
+  render();
+});
+
+// Calendar: previous / next month, back to this month
+$('cal-prev').addEventListener('click', () => {
+  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1);
+  render();
+});
+
+$('cal-next').addEventListener('click', () => {
+  calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1);
+  render();
+});
+
+$('cal-today').addEventListener('click', () => {
+  calMonth = firstOfMonth(new Date());
+  render();
+});
+
+// Click a day to add a task on that date
+$('cal-grid').addEventListener('click', (e) => {
+  const cell = e.target.closest('.cal-cell');
+  if (cell) openTaskDialog(cell.dataset.date);
+});
 
 $('sub-tabs').addEventListener('click', (e) => {
   if (!e.target.dataset.sub) return;

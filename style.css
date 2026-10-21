@@ -161,6 +161,90 @@ h2 {
   font-weight: 600;
 }
 
+/* ---------- Calendar view ---------- */
+
+/* No summary cards on the calendar: the page gets two columns */
+#layout.calendar-mode {
+  grid-template-columns: 200px minmax(0, 1fr);
+}
+
+#cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+#cal-nav h2 {
+  font-size: 1.4rem;
+  margin-right: auto;
+}
+
+#cal-nav button {
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+}
+
+#cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.cal-head {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.cal-cell {
+  min-height: 92px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cal-cell.other {
+  opacity: 0.45;
+}
+
+.cal-cell.today {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.cal-day {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.cal-item {
+  margin-top: 2px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: rgba(107, 143, 138, 0.2);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cal-item.done {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.cal-more {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
 /* ---------- Checklist view ---------- */
 
 #sub-tabs {
@@ -354,9 +438,25 @@ dialog::backdrop {
 /* ---------- Phone ---------- */
 
 @media (max-width: 720px) {
-  #layout {
+  #layout,
+  #layout.calendar-mode {
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  /* Calendar cells are too small for text on a phone: items become small bars */
+  .cal-cell {
+    min-height: 56px;
+  }
+
+  .cal-item {
+    height: 6px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .cal-more {
+    display: none;
   }
 
   /* Sidebar turns into a row of pills that scrolls sideways */

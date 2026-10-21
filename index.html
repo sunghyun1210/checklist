@@ -11,6 +11,7 @@
   <header id="topbar">
     <nav id="main-tabs">
       <button type="button" data-view="checklist">Checklist</button>
+      <button type="button" data-view="calendar">Calendar</button>
     </nav>
     <button type="button" id="new-task">+ New task</button>
   </header>
@@ -40,6 +41,16 @@
           <span id="count"></span>
           <button type="button" id="clear-done">Clear completed</button>
         </div>
+      </section>
+
+      <section id="calendar-view" hidden>
+        <div id="cal-nav">
+          <button type="button" id="cal-prev" aria-label="Previous month">&lsaquo;</button>
+          <h2 id="cal-title"></h2>
+          <button type="button" id="cal-next" aria-label="Next month">&rsaquo;</button>
+          <button type="button" id="cal-today">Today</button>
+        </div>
+        <div id="cal-grid"></div>
       </section>
     </main>
 
