@@ -1,10 +1,11 @@
 const STORAGE_KEY = 'checklist-items';
 
-// Each item: { id, text, scope, period, done }
+// Each item: { id, text, category, scope, period, done }
 // scope is 'day' | 'week' | 'month'; period is the key of that day/week/month
 let items = loadItems();
 let scope = 'day';
 let viewDate = new Date(); // the date we are currently looking at
+let category = ''; // selected category tab in lowercase ('' = All)
 
 const form = document.getElementById('add-form');
 const input = document.getElementById('new-item');
@@ -12,6 +13,7 @@ const list = document.getElementById('list');
 const periodLabel = document.getElementById('period-label');
 const footer = document.getElementById('footer');
 const count = document.getElementById('count');
+const categoryTabs = document.getElementById('category-tabs');
 
 // ---------- Storage ----------
 
@@ -80,6 +82,7 @@ function render() {
     btn.classList.toggle('active', btn.dataset.scope === scope);
   });
 
+  renderCategoryTabs(); // must run first: it may reset the selected category
   const visible = visibleItems();
 
   list.innerHTML = '';
@@ -102,7 +105,17 @@ function render() {
     del.textContent = '×';
     del.setAttribute('aria-label', 'Delete');
 
-    li.append(checkbox, text, del);
+    li.append(checkbox, text);
+
+    // On the All tab, show which category the item belongs to
+    if (item.category && !category) {
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = item.category;
+      li.append(tag);
+    }
+
+    li.append(del);
     list.appendChild(li);
   });
 
@@ -112,24 +125,86 @@ function render() {
   footer.hidden = visible.length === 0;
 }
 
-// Items of the current day/week/month: unfinished first, finished at the bottom
-function visibleItems() {
+// All items of the current day/week/month (every category)
+function periodItems() {
   const period = currentPeriod();
-  return items
-    .filter((item) => item.scope === scope && item.period === period)
+  return items.filter((item) => item.scope === scope && item.period === period);
+}
+
+// What is on screen: the selected category only, unfinished first, finished at the bottom
+function visibleItems() {
+  return periodItems()
+    .filter((item) => !category || (item.category || '').toLowerCase() === category)
     .sort((a, b) => a.done - b.done); // sort is stable, so the original order is kept
+}
+
+// ---------- Categories ----------
+
+// Category names used in the current list (@aie510 and @AIE510 count as the same one)
+function categoryNames() {
+  const names = [];
+  periodItems().forEach((item) => {
+    const name = item.category;
+    if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) {
+      names.push(name);
+    }
+  });
+  return names;
+}
+
+// Reuse the spelling already in this list if there is one
+function canonicalCategory(name) {
+  return categoryNames().find((n) => n.toLowerCase() === name.toLowerCase()) || name;
+}
+
+function renderCategoryTabs() {
+  const names = categoryNames();
+
+  // The selected category may be gone (deleted items, or another day): back to All
+  if (category && !names.some((n) => n.toLowerCase() === category)) {
+    category = '';
+  }
+
+  categoryTabs.innerHTML = '';
+  categoryTabs.hidden = names.length === 0;
+
+  ['All'].concat(names).forEach((name) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = name;
+    btn.dataset.category = name === 'All' ? '' : name.toLowerCase();
+    btn.classList.toggle('active', btn.dataset.category === category);
+    categoryTabs.appendChild(btn);
+  });
+}
+
+// "@AIE510 quiz 3" -> { category: 'AIE510', text: 'quiz 3' }
+function parseInput(raw) {
+  let cat = '';
+  let text = raw.replace(/(^|\s)@(\S+)/, (match, space, name) => {
+    cat = name; // only the first @word counts
+    return space;
+  });
+
+  text = text.replace(/\s+/g, ' ').trim();
+  text = text.replace(/^"(.*)"$/, '$1'); // the placeholder shows the task in quotes
+  return { category: cat, text: text.trim() };
 }
 
 // ---------- Events ----------
 
 form.addEventListener('submit', (e) => {
   e.preventDefault(); // stop the page from reloading
-  const text = input.value.trim();
-  if (!text) return; // ignore empty input
+  const parsed = parseInput(input.value);
+  if (!parsed.text) return; // ignore empty input
+
+  // No @ typed: use the selected category tab (if any)
+  const typed = parsed.category || category;
 
   items.push({
     id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-    text: text,
+    text: parsed.text,
+    category: typed ? canonicalCategory(typed) : '',
     scope: scope,
     period: currentPeriod(),
     done: false,
@@ -163,6 +238,12 @@ document.getElementById('clear-done').addEventListener('click', () => {
   const shown = visibleItems();
   items = items.filter((it) => !(shown.includes(it) && it.done));
   saveItems();
+  render();
+});
+
+categoryTabs.addEventListener('click', (e) => {
+  if (e.target.dataset.category === undefined) return;
+  category = e.target.dataset.category;
   render();
 });
 
