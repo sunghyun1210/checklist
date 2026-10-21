@@ -415,8 +415,9 @@ function renderMiniCalendar() {
   }
 }
 
-// Sub toolbar: the tabs depend on the main tab, the four numbers follow the sidebar filter.
-// Late items are not counted in "Due today" / "This week" (they have their own number).
+// Sub toolbar: the tabs depend on the main tab; the four numbers always count everything.
+// Late items are not counted in "Due today" / "This week" (they have their own number),
+// and "Done" is only what was finished today, so it starts from 0 again every day.
 function renderHead() {
   const options =
     view === 'checklist'
@@ -436,7 +437,7 @@ function renderHead() {
     tabs.append(btn);
   });
 
-  const mine = filteredItems();
+  const mine = items; // always everything: the numbers do not change with the sidebar filter or search
   const open = mine.filter((it) => !it.done);
   const today = fromKey(todayKey());
   const weekEnd = dateKey(addDays(today, 6 - today.getDay())); // the week ends on Saturday
