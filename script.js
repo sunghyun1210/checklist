@@ -694,6 +694,7 @@ function openTaskDialog(date) {
   $('chip-minutes').value = '0';
   input.value = '';
   showPreview();
+  hideSuggest();
   dialog.showModal();
   input.focus();
 }
@@ -713,7 +714,108 @@ function showPreview() {
   if (parsed.due) box.append(el('span', 'pill', dateLabel(parsed.due)));
 }
 
-input.addEventListener('input', showPreview);
+// ---------- @category suggestions in the popup ----------
+// Typing "@" lists every category; "@A" only the ones that start with A.
+
+const suggestBox = $('suggest');
+let suggestions = []; // the names in the list right now
+let suggestIndex = 0; // which one is highlighted
+
+// The "@word" being typed at the cursor, or null. Only the first @word of a task counts as its
+// category, so there is nothing to suggest after another one.
+function categoryToken() {
+  const caret = input.selectionStart;
+  const before = input.value.slice(0, caret);
+  const m = /(^|\s)@(\S*)$/.exec(before);
+  if (!m) return null;
+
+  const start = m.index + m[1].length; // position of the @
+  if (/(^|\s)@\S/.test(before.slice(0, start))) return null;
+
+  const rest = /^\S*/.exec(input.value.slice(caret))[0]; // the rest of the word, if the cursor is inside it
+  return { start: start, end: caret + rest.length, typed: m[2] };
+}
+
+function hideSuggest() {
+  suggestBox.hidden = true;
+  suggestions = [];
+}
+
+function updateSuggest() {
+  const token = categoryToken();
+  if (!token) return hideSuggest();
+
+  const typed = token.typed.toLowerCase();
+  suggestions = categoryNames().filter((name) => name.toLowerCase().startsWith(typed));
+
+  // Nothing matches, or it is already typed out completely: no list (Enter then adds the task)
+  if (!suggestions.length || (suggestions.length === 1 && suggestions[0].toLowerCase() === typed)) {
+    return hideSuggest();
+  }
+
+  suggestIndex = 0;
+  drawSuggest();
+  suggestBox.hidden = false;
+}
+
+function drawSuggest() {
+  suggestBox.innerHTML = '';
+  suggestions.forEach((name, i) => {
+    const li = el('li', i === suggestIndex ? 'active' : '');
+    li.setAttribute('role', 'option');
+    li.dataset.name = name;
+    colorize(li, name);
+    li.append(el('span', 'dot'), el('span', '', name));
+    suggestBox.append(li);
+  });
+}
+
+// Replace the @word with the chosen category and a space, so typing can go on
+function pickSuggestion(name) {
+  const token = categoryToken();
+  if (!token) return;
+  const tail = input.value.slice(token.end).replace(/^\s+/, '');
+  input.value = input.value.slice(0, token.start) + '@' + name + ' ' + tail;
+  const cursor = token.start + name.length + 2;
+  input.setSelectionRange(cursor, cursor);
+  input.focus();
+  hideSuggest();
+  showPreview();
+}
+
+input.addEventListener('input', () => {
+  showPreview();
+  updateSuggest();
+});
+input.addEventListener('click', updateSuggest); // the cursor moved
+input.addEventListener('keyup', (e) => {
+  if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) updateSuggest();
+});
+
+input.addEventListener('keydown', (e) => {
+  if (suggestBox.hidden || e.isComposing) return;
+
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    suggestIndex = (suggestIndex + step + suggestions.length) % suggestions.length;
+    drawSuggest();
+    suggestBox.children[suggestIndex].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault(); // Enter picks the category instead of adding the task
+    pickSuggestion(suggestions[suggestIndex]);
+  } else if (e.key === 'Escape') {
+    e.preventDefault(); // closes the list, not the popup
+    hideSuggest();
+  }
+});
+
+// A click on a name must not take the focus away from the text box
+suggestBox.addEventListener('mousedown', (e) => e.preventDefault());
+suggestBox.addEventListener('click', (e) => {
+  const item = e.target.closest('li');
+  if (item) pickSuggestion(item.dataset.name);
+});
 
 $('new-task').addEventListener('click', () => openTaskDialog());
 

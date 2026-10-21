@@ -137,6 +137,9 @@
   <dialog id="task-dialog">
     <form id="add-form">
       <input id="new-item" type="text" placeholder='Add a new item (e.g. @Category "task" t30)' autocomplete="off">
+      <!-- Categories that match what was typed after an @ -->
+      <ul id="suggest" role="listbox" aria-label="Categories" hidden></ul>
+
       <!-- Shows what was recognized in the text while typing -->
       <div id="preview"></div>
       <div class="chips">
@@ -157,7 +160,7 @@
         <button type="submit">Add</button>
       </div>
       <p class="hint">
-        <b>@category</b> &middot; <b>t25</b> = 25 min &middot; <b>d10/25</b> &middot; <b>d+3</b> (3 days later)
+        <b>@</b> picks a category (&uarr;&darr;, Enter or Tab) &middot; <b>t25</b> = 25 min &middot; <b>d10/25</b> &middot; <b>d+3</b> (3 days later)
         &middot; <b>dtom</b> &middot; <b>dmon</b> &middot; Enter adds, Esc closes
       </p>
     </form>

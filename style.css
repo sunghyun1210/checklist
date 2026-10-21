@@ -1025,6 +1025,31 @@ dialog::backdrop {
   margin-left: auto;
 }
 
+/* Category suggestions while typing an @ */
+#suggest {
+  list-style: none;
+  max-height: 176px;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  border-radius: 14px;
+  background: var(--soft);
+}
+
+#suggest li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+#suggest li.active {
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+
 /* What the text box understood (category, time, date) */
 #preview {
   display: flex;
